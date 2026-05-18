@@ -1,0 +1,108 @@
+import { Router, Request, Response, NextFunction } from 'express';
+import { Objective, ObjectiveStatus, ObjectiveOrigin } from '../types';
+import { generateId, nowIso } from '../utils/id';
+import { AppError } from '../utils/errors';
+import { listByUser, getById, create, update, remove, COLLECTIONS } from '../services/storage';
+import { logActivity } from '../services/activities';
+import { suggestObjectives } from '../services/objectivesSuggest';
+
+const router = Router();
+
+router.get('/', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const items = await listByUser<Objective>(COLLECTIONS.objectives, req.userId);
+    res.json(items);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { titulo, descricao, categoria, status, origem, prioridade, prazo } = req.body;
+
+    if (!titulo || !descricao) {
+      throw new AppError(400, 'titulo and descricao are required');
+    }
+
+    const id = generateId();
+    const objective: Objective = {
+      id,
+      userId: req.userId,
+      titulo: String(titulo),
+      descricao: String(descricao),
+      categoria: String(categoria ?? 'Geral'),
+      status: (status as ObjectiveStatus) ?? 'pendente',
+      origem: (origem as ObjectiveOrigin) ?? 'manual',
+      prioridade: prioridade != null ? Number(prioridade) : undefined,
+      prazo: prazo ? String(prazo) : undefined,
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    };
+
+    await create(COLLECTIONS.objectives, id, objective as unknown as Record<string, unknown>);
+    await logActivity(req.userId, 'objective', `Objetivo criado: ${objective.titulo}`, {
+      entidade: 'objective',
+      entidadeId: id,
+    });
+
+    res.status(201).json(objective);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/suggest', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const context = req.body?.context ?? req.body?.message;
+    const suggestions = await suggestObjectives(req.userId, context);
+    res.json({ suggestions });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = String(req.params.id);
+    const existing = await getById<Objective>(COLLECTIONS.objectives, id);
+    if (!existing || existing.userId !== req.userId) {
+      throw new AppError(404, 'Objective not found');
+    }
+
+    const allowed = ['titulo', 'descricao', 'categoria', 'status', 'origem', 'prioridade', 'prazo'];
+    const patch: Partial<Objective> = {};
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) {
+        (patch as Record<string, unknown>)[key] = req.body[key];
+      }
+    }
+
+    const updated = await update<Objective>(COLLECTIONS.objectives, id, patch);
+    res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = String(req.params.id);
+    const existing = await getById<Objective>(COLLECTIONS.objectives, id);
+    if (!existing || existing.userId !== req.userId) {
+      throw new AppError(404, 'Objective not found');
+    }
+
+    await remove(COLLECTIONS.objectives, id);
+    await logActivity(req.userId, 'objective', `Objetivo removido: ${existing.titulo}`, {
+      entidade: 'objective',
+      entidadeId: id,
+    });
+
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+});
+
+export default router;
