@@ -24,6 +24,10 @@ Thumbs.db
 # Scraped assets (reverse-engineering temp)
 scraped/
 
+# Cursor / agent local
+.agents/
+skills-lock.json
+
 # Firebase
 *-firebase-adminsdk*.json
 serviceAccount*.json

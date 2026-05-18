@@ -52,7 +52,9 @@ export function DashboardLayout() {
           <nav className="sidebar-nav">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const active = location.pathname === item.path || (item.path === '/dashboard' && location.pathname === '/dashboard');
+              const active =
+                location.pathname === item.path ||
+                (item.path === '/dashboard' && (location.pathname === '/dashboard' || location.pathname === '/dashboard/'));
               return (
                 <button
                   key={item.id}

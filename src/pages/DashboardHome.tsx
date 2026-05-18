@@ -10,6 +10,9 @@ import {
   Bot,
   Target,
   ArrowRight,
+  FileText,
+  Clock,
+  Crosshair,
 } from 'lucide-react';
 import { auth } from '../config/firebase';
 import { getInitialForm } from '../services/initialForm';
@@ -24,6 +27,26 @@ function formatDate(d: Date) {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+function formatActivityDate(iso?: string) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return 'Hoje';
+  if (diffDays === 1) return 'Ontem';
+  if (diffDays < 7) return `Há ${diffDays} dias`;
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+}
+
+function activityIndicatorType(type: string): 'success' | 'info' {
+  const t = type.toLowerCase();
+  if (t.includes('report') || t.includes('relatorio') || t.includes('objective') || t.includes('objetivo')) {
+    return 'success';
+  }
+  return 'info';
 }
 
 export function DashboardHome() {
@@ -90,8 +113,8 @@ export function DashboardHome() {
         setActivities(
           actList.slice(0, 5).map((a: { title?: string; type?: string; createdAt?: string }) => ({
             action: a.title || 'Atividade',
-            date: a.createdAt ? new Date(a.createdAt).toLocaleString('pt-BR') : '',
-            type: a.type || 'info',
+            date: formatActivityDate(a.createdAt),
+            type: activityIndicatorType(a.type || ''),
           }))
         );
       })
@@ -203,12 +226,12 @@ export function DashboardHome() {
       </div>
 
       <div className="dashboard-section">
-        <div className="section-header">
+        <div className="section-header-row">
           <div className="section-title-group">
             <Lightbulb size={24} className="section-icon" />
             <h2 className="section-title">Recomendações</h2>
           </div>
-          <p className="section-subtitle">
+          <p className="section-inline-subtitle">
             Objetivos em aberto — priorize as ações com base na análise do seu negócio
           </p>
         </div>
@@ -243,10 +266,17 @@ export function DashboardHome() {
       </div>
 
       <div className="dashboard-section">
-        <div className="section-header">
-          <h2 className="section-title">Ações Rápidas</h2>
+        <div className="section-header-row">
+          <div className="section-title-group">
+            <Crosshair size={24} className="section-icon" />
+            <h2 className="section-title">Ações Rápidas</h2>
+          </div>
         </div>
         <div className="quick-actions-grid">
+          <button type="button" className="quick-action-card" onClick={() => navigate('/dashboard/initial-form')}>
+            <FileText size={32} className="action-icon" />
+            <span className="action-label">Editar Formulário</span>
+          </button>
           <button type="button" className="quick-action-card" onClick={() => navigate('/dashboard/consultoria-ia')}>
             <Bot size={32} className="action-icon" />
             <span className="action-label">Consultoria IA</span>
@@ -259,12 +289,19 @@ export function DashboardHome() {
             <Target size={32} className="action-icon" />
             <span className="action-label">Criar Objetivo</span>
           </button>
+          <button type="button" className="quick-action-card" onClick={() => navigate('/dashboard/relatorios')}>
+            <BarChart3 size={32} className="action-icon" />
+            <span className="action-label">Gerar Relatório</span>
+          </button>
         </div>
       </div>
 
       <div className="dashboard-section">
-        <div className="section-header">
-          <h2 className="section-title">Atividade Recente</h2>
+        <div className="section-header-row">
+          <div className="section-title-group">
+            <Clock size={24} className="section-icon" />
+            <h2 className="section-title">Atividade Recente</h2>
+          </div>
         </div>
         {statsLoading ? (
           <div className="activity-list-loading">
