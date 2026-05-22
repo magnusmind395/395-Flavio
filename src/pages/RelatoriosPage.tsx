@@ -207,14 +207,34 @@ export function RelatoriosPage() {
             )}
 
             {detail.conteudo && (
-              <section className="relatorio-section">
-                <h2 className="relatorio-section-title">
-                  <FileText size={22} />
-                  Conteúdo completo
-                </h2>
-                <div className="message-text">
-                  <ReactMarkdown>{detail.conteudo}</ReactMarkdown>
-                </div>
+              <section className="relatorio-paper-section">
+                <header className="report-paper-header">
+                  <div className="report-paper-eyebrow">
+                    <FileText size={14} aria-hidden />
+                    <span>Dossiê · Relatório Completo</span>
+                  </div>
+                  <div className="report-paper-meta">
+                    <span className="report-paper-meta-brand">Magnus Intelligence Dashboard</span>
+                    <span className="report-paper-meta-divider" aria-hidden>·</span>
+                    <span className="report-paper-meta-date">
+                      {new Date(detail.createdAt).toLocaleDateString('pt-BR', {
+                        day: '2-digit',
+                        month: 'long',
+                        year: 'numeric',
+                      })}
+                    </span>
+                  </div>
+                </header>
+                <article className="report-paper" aria-label="Conteúdo do relatório">
+                  <div className="report-paper-watermark" aria-hidden>MM</div>
+                  <div className="report-paper-body">
+                    <ReactMarkdown>{detail.conteudo}</ReactMarkdown>
+                  </div>
+                  <footer className="report-paper-footer">
+                    <span>Documento gerado por Magnus Mind · uso interno</span>
+                    <span className="report-paper-stamp">CONFIDENCIAL</span>
+                  </footer>
+                </article>
               </section>
             )}
           </div>

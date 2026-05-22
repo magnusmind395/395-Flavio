@@ -120,3 +120,60 @@ export const activitiesApi = {
   list: (params?: Record<string, string>) =>
     withUserId((userId) => api.get('/api/activities', { params: { ...params, ...(userId ? { userId } : {}) } }).then((r) => r.data)),
 };
+
+export interface AgentSettingsDto {
+  id?: string;
+  userId?: string;
+  enabled: boolean;
+  personaOverride?: string;
+  rules?: string;
+  tone?: string;
+  responseFormat?: string;
+  forbidden?: string;
+  preferredModel?: string;
+  updatedAt?: string;
+}
+
+export interface AgentSkillDto {
+  id: string;
+  userId?: string;
+  slug: string;
+  title: string;
+  description?: string;
+  content: string;
+  tags?: string[];
+  enabled: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export const agentApi = {
+  getSettings: () =>
+    withUserId((userId) =>
+      api
+        .get('/api/agent/settings', { params: userId ? { userId } : {} })
+        .then((r) => r.data as AgentSettingsDto)
+    ),
+  saveSettings: (data: Partial<AgentSettingsDto>) =>
+    withUserId((userId) =>
+      api
+        .put('/api/agent/settings', { ...(userId ? { userId } : {}), ...data })
+        .then((r) => r.data as AgentSettingsDto)
+    ),
+  listSkills: () =>
+    withUserId((userId) =>
+      api
+        .get('/api/agent/skills', { params: userId ? { userId } : {} })
+        .then((r) => (Array.isArray(r.data) ? (r.data as AgentSkillDto[]) : []))
+    ),
+  createSkill: (data: Partial<AgentSkillDto>) =>
+    withUserId((userId) =>
+      api
+        .post('/api/agent/skills', { ...(userId ? { userId } : {}), ...data })
+        .then((r) => r.data as AgentSkillDto)
+    ),
+  updateSkill: (id: string, data: Partial<AgentSkillDto>) =>
+    api.patch(`/api/agent/skills/${id}`, data).then((r) => r.data as AgentSkillDto),
+  removeSkill: (id: string) =>
+    api.delete(`/api/agent/skills/${id}`).then((r) => r.data),
+};

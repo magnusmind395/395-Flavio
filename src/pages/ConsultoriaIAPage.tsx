@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { getInitialForm } from '../services/initialForm';
@@ -12,13 +12,15 @@ import {
   Pencil,
   Plus,
   Send,
+  Settings2,
   Sparkles,
   Target,
   User,
   X,
   Check,
+  Zap,
 } from 'lucide-react';
-import { aiApi } from '../services/api';
+import { agentApi, aiApi, type AgentSkillDto } from '../services/api';
 import type { ChatMessage } from '../types';
 
 const SUGGESTIONS = [
@@ -72,6 +74,7 @@ function mapMessages(raw: ServerMessage[], conversationId: string): ChatMessage[
 }
 
 export function ConsultoriaIAPage() {
+  const navigate = useNavigate();
   const [models, setModels] = useState<AiModel[]>([]);
   const [conversations, setConversations] = useState<ConvSummary[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -86,9 +89,72 @@ export function ConsultoriaIAPage() {
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const [diagnosticComplete, setDiagnosticComplete] = useState<boolean | null>(null);
+  const [skills, setSkills] = useState<AgentSkillDto[]>([]);
+  const [skillMenuOpen, setSkillMenuOpen] = useState(false);
+  const [skillSearch, setSkillSearch] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const activeConv = conversations.find((c) => c.id === activeId);
+
+  const enabledSkills = skills.filter((s) => s.enabled);
+  const filteredSkills = skillSearch
+    ? enabledSkills.filter(
+        (s) =>
+          s.slug.toLowerCase().includes(skillSearch.toLowerCase()) ||
+          s.title.toLowerCase().includes(skillSearch.toLowerCase())
+      )
+    : enabledSkills;
+
+  useEffect(() => {
+    agentApi
+      .listSkills()
+      .then((list) => setSkills(list))
+      .catch(() => setSkills([]));
+  }, []);
+
+  const insertSkillSlug = (slug: string) => {
+    const el = inputRef.current;
+    if (!el) {
+      setInput((prev) => `${prev}${prev.endsWith(' ') || prev === '' ? '' : ' '}/${slug} `);
+      setSkillMenuOpen(false);
+      setSkillSearch('');
+      return;
+    }
+    const value = el.value;
+    const caret = el.selectionStart ?? value.length;
+    const before = value.slice(0, caret);
+    const after = value.slice(caret);
+    const lastSlashIdx = before.lastIndexOf('/');
+    const safeStart =
+      lastSlashIdx >= 0 && /^\/[a-z0-9_-]*$/i.test(before.slice(lastSlashIdx))
+        ? lastSlashIdx
+        : before.length;
+    const updated = `${before.slice(0, safeStart)}/${slug} ${after}`;
+    setInput(updated);
+    setSkillMenuOpen(false);
+    setSkillSearch('');
+    requestAnimationFrame(() => {
+      const pos = safeStart + slug.length + 2;
+      el.focus();
+      el.setSelectionRange(pos, pos);
+    });
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setInput(value);
+    const caret = e.target.selectionStart ?? value.length;
+    const before = value.slice(0, caret);
+    const match = before.match(/(?:^|\s)\/([a-z0-9_-]*)$/i);
+    if (match) {
+      setSkillMenuOpen(true);
+      setSkillSearch(match[1]);
+    } else {
+      setSkillMenuOpen(false);
+      setSkillSearch('');
+    }
+  };
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -380,6 +446,16 @@ export function ConsultoriaIAPage() {
                 ))}
               </select>
             </div>
+            <button
+              type="button"
+              className="chat-config-button"
+              onClick={() => navigate('/dashboard/blueprint/config')}
+              aria-label="Configurar agente e skills"
+              title="Configurar agente e skills"
+            >
+              <Settings2 size={16} aria-hidden />
+              <span>Config · Skills</span>
+            </button>
           </header>
 
           <div className="chat-messages">
@@ -519,13 +595,52 @@ export function ConsultoriaIAPage() {
 
           <div className="chat-input-container">
             <div className="chat-input-wrapper">
+              {skillMenuOpen && filteredSkills.length > 0 && (
+                <div className="chat-skill-menu" role="listbox" aria-label="Skills disponíveis">
+                  <div className="chat-skill-menu-header">
+                    <Zap size={12} aria-hidden />
+                    <span>Skills disponíveis</span>
+                  </div>
+                  {filteredSkills.slice(0, 6).map((skill) => (
+                    <button
+                      key={skill.id}
+                      type="button"
+                      className="chat-skill-menu-item"
+                      onClick={() => insertSkillSlug(skill.slug)}
+                      role="option"
+                      aria-selected={false}
+                    >
+                      <span className="chat-skill-menu-slug">/{skill.slug}</span>
+                      <span className="chat-skill-menu-title">{skill.title}</span>
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    className="chat-skill-menu-footer"
+                    onClick={() => navigate('/dashboard/blueprint/config')}
+                  >
+                    <Plus size={12} aria-hidden />
+                    Gerenciar skills
+                  </button>
+                </div>
+              )}
               <input
+                ref={inputRef}
                 type="text"
                 className="chat-input"
-                placeholder="Digite sua pergunta..."
+                placeholder="Digite sua pergunta — ou use /skill para ativar habilidades"
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={handleInputChange}
                 onKeyDown={(e) => {
+                  if (e.key === 'Escape' && skillMenuOpen) {
+                    setSkillMenuOpen(false);
+                    return;
+                  }
+                  if (e.key === 'Tab' && skillMenuOpen && filteredSkills.length > 0) {
+                    e.preventDefault();
+                    insertSkillSlug(filteredSkills[0].slug);
+                    return;
+                  }
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     sendMessage(input);

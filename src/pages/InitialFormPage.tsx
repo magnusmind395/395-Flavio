@@ -1,9 +1,10 @@
 import { FormEvent, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { DIAGNOSTIC_FIELD_STEPS } from '../constants/magnusWaves';
 import { getInitialForm, saveInitialForm } from '../services/initialForm';
-import { BUSINESS_STAGES, type InitialFormData } from '../types';
+import { BUSINESS_STAGES, STAGE_DESCRIPTIONS, type InitialFormData } from '../types';
 
 const empty: InitialFormData = {
   organizacao: '',
@@ -14,13 +15,13 @@ const empty: InitialFormData = {
 };
 
 export function InitialFormPage() {
+  const navigate = useNavigate();
   const [userId, setUserId] = useState<string | null>(null);
   const [data, setData] = useState<InitialFormData>(empty);
   const [errors, setErrors] = useState<Partial<Record<keyof InitialFormData, string>>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [completedAt, setCompletedAt] = useState<Date | null>(null);
-  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setUserId(u?.uid ?? null));
@@ -53,11 +54,20 @@ export function InitialFormPage() {
     ev.preventDefault();
     if (!userId || !validate()) return;
     setSaving(true);
-    setSuccess(false);
     try {
       const at = await saveInitialForm(userId, data);
       setCompletedAt(at);
-      setSuccess(true);
+      navigate('/dashboard', {
+        state: {
+          postDiagnosticNotice: {
+            title: 'Diagnóstico concluído com sucesso',
+            message:
+              'Seu Human-to-Business Canvas foi salvo e o Hub já foi atualizado com os dados desta etapa.',
+            nextStepLabel: 'Próximo passo recomendado: Design (MM Blueprint)',
+            completedAt: at.toISOString(),
+          },
+        },
+      });
     } catch {
       setErrors({ organizacao: 'Erro ao salvar. Tente novamente.' });
     } finally {
@@ -91,12 +101,6 @@ export function InitialFormPage() {
             Canvas atualizado em: <strong>{completedAt.toLocaleString('pt-BR')}</strong>
           </p>
         )}
-        {success && (
-          <p className="form-success-msg">
-            Diagnóstico salvo. Próximo passo: <strong>Design (MM Blueprint)</strong> na People Sprint IA.
-          </p>
-        )}
-
         <form className="initial-form" onSubmit={handleSubmit}>
           {textFields.map((step, index) => {
             const field = step.field;
@@ -123,9 +127,9 @@ export function InitialFormPage() {
             );
           })}
 
-          <div className="form-group">
+          <fieldset className="form-group stage-fieldset">
             <span className="diagnostic-step-badge">{stageStep.label}</span>
-            <label className="form-label">3. {stageStep.hint}</label>
+            <legend className="form-label">3. {stageStep.hint}</legend>
             <div className="radio-group">
               {BUSINESS_STAGES.map((stage) => (
                 <label
@@ -136,15 +140,19 @@ export function InitialFormPage() {
                     type="radio"
                     name="estagio"
                     className="radio-input"
+                    value={stage}
                     checked={data.estagioNegocio === stage}
                     onChange={() => setData({ ...data, estagioNegocio: stage })}
                   />
-                  <span className="radio-label">{stage}</span>
+                  <span className="radio-content">
+                    <span className="radio-label">{stage}</span>
+                    <span className="radio-description">{STAGE_DESCRIPTIONS[stage]}</span>
+                  </span>
                 </label>
               ))}
             </div>
             {errors.estagioNegocio && <span className="error-message">{errors.estagioNegocio}</span>}
-          </div>
+          </fieldset>
 
           <button type="submit" className="btn-primary" disabled={saving}>
             {saving ? 'Salvando canvas...' : 'Salvar Human-to-Business Canvas'}

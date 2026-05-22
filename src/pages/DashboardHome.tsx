@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   CheckCircle,
@@ -13,6 +13,7 @@ import {
   FileText,
   Clock,
   Crosshair,
+  X,
 } from 'lucide-react';
 import { auth } from '../config/firebase';
 import { getInitialForm } from '../services/initialForm';
@@ -51,8 +52,22 @@ function activityIndicatorType(type: string): 'success' | 'info' {
 }
 
 export function DashboardHome() {
+  const location = useLocation();
   const navigate = useNavigate();
+  const locationState = location.state as
+    | {
+        postDiagnosticNotice?: {
+          title: string;
+          message: string;
+          nextStepLabel?: string;
+          completedAt?: string;
+        };
+      }
+    | undefined;
   const [userId, setUserId] = useState<string | null>(null);
+  const [postDiagnosticNotice, setPostDiagnosticNotice] = useState(
+    () => locationState?.postDiagnosticNotice ?? null
+  );
   const [formCompletedAt, setFormCompletedAt] = useState<Date | null>(null);
   const [formData, setFormData] = useState<InitialFormData | null>(null);
   const [formLoading, setFormLoading] = useState(true);
@@ -68,6 +83,12 @@ export function DashboardHome() {
     const unsub = onAuthStateChanged(auth, (u) => setUserId(u?.uid ?? null));
     return unsub;
   }, []);
+
+  useEffect(() => {
+    if (!locationState?.postDiagnosticNotice) return;
+    setPostDiagnosticNotice(locationState.postDiagnosticNotice);
+    navigate('/dashboard', { replace: true });
+  }, [locationState, navigate]);
 
   useEffect(() => {
     if (!userId) return;
@@ -135,6 +156,43 @@ export function DashboardHome() {
           </p>
         </div>
       </div>
+
+      {postDiagnosticNotice && (
+        <div className="dashboard-post-submit-banner" role="status" aria-live="polite">
+          <div className="dashboard-post-submit-content">
+            <div className="dashboard-post-submit-icon" aria-hidden>
+              <CheckCircle size={22} />
+            </div>
+            <div className="dashboard-post-submit-text">
+              <h3>{postDiagnosticNotice.title}</h3>
+              <p>{postDiagnosticNotice.message}</p>
+              {postDiagnosticNotice.nextStepLabel && (
+                <span className="dashboard-post-submit-next-step">
+                  {postDiagnosticNotice.nextStepLabel}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="dashboard-post-submit-actions">
+            <button
+              type="button"
+              className="dashboard-post-submit-btn"
+              onClick={() => navigate('/dashboard/consultoria-ia')}
+            >
+              Ir para MM Blueprint
+              <ArrowRight size={16} />
+            </button>
+            <button
+              type="button"
+              className="dashboard-post-submit-close"
+              onClick={() => setPostDiagnosticNotice(null)}
+              aria-label="Fechar aviso de confirmação"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       <MagnusWavesProgress
         progress={{

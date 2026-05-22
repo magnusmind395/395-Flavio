@@ -70,16 +70,51 @@
 .chat-suggestions {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
+  gap: 0.95rem;
   width: 100%;
   max-width: 480px;
 }
 
 .suggestion-button {
   width: 100%;
-  min-height: 44px;
+  min-height: 68px;
   text-align: left;
-  padding: 0.75rem 1rem !important;
+  padding: 1.05rem 2rem !important;
+  border-radius: 14px !important;
+  border: 1px solid rgba(67, 147, 255, 0.46) !important;
+  background:
+    linear-gradient(180deg, rgba(7, 34, 79, 0.92) 0%, rgba(6, 27, 68, 0.94) 100%),
+    radial-gradient(circle at 8% 20%, rgba(91, 170, 255, 0.16), transparent 58%) !important;
+  color: #f5f9ff !important;
+  font-size: 1.08rem !important;
+  font-weight: 700 !important;
+  line-height: 1.24 !important;
+  letter-spacing: 0.01em;
+  box-shadow:
+    0 12px 28px rgba(3, 15, 40, 0.42),
+    inset 0 0 0 1px rgba(139, 202, 255, 0.08),
+    0 0 0 1px rgba(54, 140, 255, 0.1);
+  transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease,
+    background 220ms ease;
+}
+
+.suggestion-button:hover {
+  transform: translateY(-2px);
+  border-color: rgba(99, 176, 255, 0.72) !important;
+  box-shadow:
+    0 16px 30px rgba(3, 18, 46, 0.48),
+    inset 0 0 0 1px rgba(162, 214, 255, 0.22),
+    0 0 24px rgba(84, 162, 255, 0.28);
+}
+
+.suggestion-button:active {
+  transform: translateY(0);
+}
+
+.suggestion-button:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .chat-empty-objectives-hint {
@@ -288,6 +323,12 @@
 @media (max-width: 480px) {
   .chat-empty {
     padding: var(--spacing-md) var(--spacing-sm) var(--spacing-lg);
+  }
+
+  .suggestion-button {
+    min-height: 60px;
+    padding: 0.85rem 1rem !important;
+    font-size: 0.96rem !important;
   }
 
   .chat-empty-icon {
