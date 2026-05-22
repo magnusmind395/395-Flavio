@@ -94,3 +94,38 @@ export interface SuggestedObjective {
   categoria: string;
   prioridade?: number;
 }
+
+/**
+ * Configurações persistidas do agente Magnus Mind para cada usuário.
+ * Quando ativadas, sobrescrevem partes do SYSTEM_PROMPT base no chat.
+ */
+export interface AgentSettings {
+  id: string;
+  userId: string;
+  enabled: boolean;
+  personaOverride?: string;
+  rules?: string;
+  tone?: string;
+  responseFormat?: string;
+  forbidden?: string;
+  preferredModel?: string;
+  updatedAt: string;
+}
+
+/**
+ * Skill = comando invocável via `/slug` na mensagem.
+ * Quando o usuário menciona /slug, o conteúdo da skill é injetado
+ * no contexto e o agente passa a se comportar conforme aquele preset.
+ */
+export interface AgentSkill {
+  id: string;
+  userId: string;
+  slug: string;
+  title: string;
+  description?: string;
+  content: string;
+  tags?: string[];
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}

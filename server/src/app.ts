@@ -11,6 +11,7 @@ import objectivesRouter from './routes/objectives';
 import teamMembersRouter from './routes/teamMembers';
 import activitiesRouter from './routes/activities';
 import aiRouter from './routes/ai';
+import agentRouter from './routes/agent';
 import reportsRouter from './routes/reports';
 import whatsappRouter from './routes/whatsapp';
 
@@ -58,6 +59,7 @@ app.use('/api/objectives', objectivesRouter);
 app.use('/api/team-members', teamMembersRouter);
 app.use('/api/activities', activitiesRouter);
 app.use('/api/ai', aiRouter);
+app.use('/api/agent', agentRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/whatsapp', whatsappRouter);
 

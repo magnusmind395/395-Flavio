@@ -6,6 +6,11 @@ import { retrieveRelevantContext } from './rag';
 import { shouldSearchWeb, webSearch, formatSearchResults, isSearchConfigured } from './search';
 import { create, getById, update, COLLECTIONS } from './storage';
 import { logActivity } from './activities';
+import {
+  buildAgentContext,
+  getAgentSettings,
+  resolveMentionedSkills,
+} from './agentConfig';
 
 const SYSTEM_PROMPT = `Você é o consultor estratégico Magnus Mind, especializado em gestão, OKRs, planejamento e liderança de equipes.
 Responda em português brasileiro, de forma clara e acionável.
@@ -57,10 +62,18 @@ export interface ChatResponse {
   suggestedObjectives?: SuggestedObjective[];
   usedWebSearch?: boolean;
   usedRag?: boolean;
+  invokedSkills?: string[];
 }
 
 export async function handleChat(req: ChatRequest): Promise<ChatResponse> {
-  const model = req.model ?? env.openrouter.defaultModel;
+  const agentSettings = await getAgentSettings(req.userId);
+
+  const model =
+    req.model ??
+    (agentSettings.enabled && agentSettings.preferredModel
+      ? agentSettings.preferredModel
+      : env.openrouter.defaultModel);
+
   let conversation: Conversation | null = null;
 
   if (req.conversationId) {
@@ -69,6 +82,9 @@ export async function handleChat(req: ChatRequest): Promise<ChatResponse> {
       conversation = null;
     }
   }
+
+  const invokedSkills = await resolveMentionedSkills(req.userId, req.message);
+  const agentContext = buildAgentContext(agentSettings, invokedSkills);
 
   const ragContext = await retrieveRelevantContext(req.userId, req.message);
   let webContext = '';
@@ -85,6 +101,9 @@ export async function handleChat(req: ChatRequest): Promise<ChatResponse> {
   }
 
   const systemParts = [SYSTEM_PROMPT];
+  if (agentContext) {
+    systemParts.push(agentContext);
+  }
   if (ragContext) {
     systemParts.push(`\n\n## Frameworks consultivos relevantes\n${ragContext}`);
   }
@@ -164,6 +183,10 @@ export async function handleChat(req: ChatRequest): Promise<ChatResponse> {
 
   if (suggested.length > 0) {
     response.suggestedObjectives = suggested;
+  }
+
+  if (invokedSkills.length > 0) {
+    response.invokedSkills = invokedSkills.map((s) => s.slug);
   }
 
   return response;

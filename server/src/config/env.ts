@@ -40,4 +40,6 @@ export const COLLECTIONS = {
   reports: 'reports',
   activities: 'activities',
   consultantFrameworks: 'consultantFrameworks',
+  agentSettings: 'agentSettings',
+  agentSkills: 'agentSkills',
 } as const;
