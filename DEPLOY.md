@@ -132,7 +132,17 @@ O arquivo `netlify.toml` já configura SPA redirects (`/*` → `index.html`).
 
 Ou use o blueprint `render.yaml` na raiz do repositório (Render → Blueprint).
 
-**"Cannot GET /" no navegador:** você abriu a URL da **API** (`three95-flavio.onrender.com`). Isso é normal se o deploy estiver desatualizado — faça **Manual Deploy** no Render após push. Com a versão atual, `/` retorna JSON e `/api/health` confirma que a API está no ar. O **app visual** fica no Netlify, não no Render.
+**"Cannot GET /api/health" (HTML):** o Render está subindo o **frontend** (Vite), não a API. Corrija em **Settings**:
+
+| Campo | Valor |
+|-------|--------|
+| Root Directory | `server` |
+| Build Command | `npm install --include=dev && npm run build` |
+| Start Command | `npm start` |
+
+Se Root Directory estiver vazio, use na raiz: Build `npm run render-build`, Start `npm run render-start` (scripts no `package.json` da raiz). Ver `scripts/RENDER-CONFIGURACAO.txt`.
+
+Resposta correta de `/api/health`: JSON `{"status":"ok",...}` — não HTML `Cannot GET`.
 
 ## Desenvolvimento local
 

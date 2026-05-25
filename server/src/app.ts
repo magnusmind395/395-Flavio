@@ -27,14 +27,15 @@ app.use(
 );
 app.use(express.json({ limit: '2mb' }));
 
-app.get('/api/health', (_req, res) => {
-  res.json({
-    status: 'ok',
-    service: 'Magnus Mind API',
-    storage: isFirebaseEnabled() ? 'firestore' : 'memory',
-    timestamp: new Date().toISOString(),
-  });
+const healthPayload = () => ({
+  status: 'ok',
+  service: 'Magnus Mind API',
+  storage: isFirebaseEnabled() ? 'firestore' : 'memory',
+  timestamp: new Date().toISOString(),
 });
+
+app.get('/api/health', (_req, res) => res.json(healthPayload()));
+app.get('/health', (_req, res) => res.json(healthPayload()));
 
 app.get('/', (_req, res) => {
   res.json({
