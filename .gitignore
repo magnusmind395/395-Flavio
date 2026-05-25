@@ -9,6 +9,8 @@ server/dist/
 .env
 .env.local
 .env.*.local
+scripts/render.env
+server/.env
 
 # Logs
 *.log
