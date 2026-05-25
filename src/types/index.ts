@@ -1,9 +1,12 @@
+export type DiagnosticFieldValue = string | string[];
+
 export interface InitialFormData {
   organizacao: string;
   produtoServico: string;
   estagioNegocio: string;
   fatoresExternos: string;
   mudancasRecentes: string;
+  [key: string]: DiagnosticFieldValue;
 }
 
 export type BusinessStage = 'Crescimento' | 'Estabilização' | 'Transformação' | 'Crise' | 'Reinvenção';

@@ -1,27 +1,449 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
+import {
+  ArrowRight,
+  Brain,
+  Check,
+  CheckCircle2,
+  CircleAlert,
+  ClipboardCheck,
+  FileText,
+  Gauge,
+  Layers3,
+  Save,
+  Sparkles,
+  Target,
+  Users,
+} from 'lucide-react';
 import { auth } from '../config/firebase';
-import { DIAGNOSTIC_FIELD_STEPS } from '../constants/magnusWaves';
-import { getInitialForm, saveInitialForm } from '../services/initialForm';
-import { BUSINESS_STAGES, STAGE_DESCRIPTIONS, type InitialFormData } from '../types';
+import {
+  DIAGNOSTIC_LENSES,
+  DIAGNOSTIC_PHASES,
+  SOLUTION_RULES,
+  buildDiagnosticContext,
+  createEmptyDiagnosticData,
+  getDiagnosticCompletion,
+  getFieldKeys,
+  getRequiredDiagnosticFieldKeys,
+  isDiagnosticValueAnswered,
+  type DiagnosticField,
+  type DiagnosticFieldType,
+  type DiagnosticLens,
+  type DiagnosticPhase,
+  type DiagnosticPhaseId,
+} from '../constants/diagnosticFlow';
+import { getInitialForm, saveInitialForm, saveInitialFormDraft } from '../services/initialForm';
+import type { DiagnosticFieldValue, InitialFormData } from '../types';
 
-const empty: InitialFormData = {
-  organizacao: '',
-  produtoServico: '',
-  estagioNegocio: '',
-  fatoresExternos: '',
-  mudancasRecentes: '',
-};
+const phaseIcons = {
+  decoding: Brain,
+  gapScan: Gauge,
+  systemScan: Layers3,
+  teamScan: Users,
+  solutionPick: Sparkles,
+} satisfies Record<DiagnosticPhaseId, typeof Brain>;
+
+function valueAsText(value: DiagnosticFieldValue | undefined) {
+  if (Array.isArray(value)) return value.join(', ');
+  return value ?? '';
+}
+
+function valueAsList(value: DiagnosticFieldValue | undefined) {
+  return Array.isArray(value) ? value : [];
+}
+
+function fieldType(field: DiagnosticField): DiagnosticFieldType {
+  return field.type ?? 'textarea';
+}
+
+function getFieldKey(field: DiagnosticField, activeLens: DiagnosticLens) {
+  return field.lenses?.length ? `${activeLens}_${field.id}` : field.id;
+}
+
+function parseScaleBounds(field: DiagnosticField) {
+  const min = Number(field.minLabel);
+  const max = Number(field.maxLabel);
+  return {
+    min: Number.isFinite(min) ? min : 1,
+    max: Number.isFinite(max) ? max : 5,
+  };
+}
+
+function getFirstAnswered(data: InitialFormData, keys: string[]) {
+  for (const key of keys) {
+    const value = data[key];
+    if (isDiagnosticValueAnswered(value)) return valueAsText(value);
+  }
+  return 'Aguardando resposta';
+}
+
+function buildFieldPhaseIndex() {
+  const index = new Map<string, DiagnosticPhaseId>();
+  for (const phase of DIAGNOSTIC_PHASES) {
+    for (const block of phase.blocks) {
+      for (const field of block.fields) {
+        for (const key of getFieldKeys(field)) {
+          index.set(key, phase.id);
+        }
+      }
+    }
+  }
+  return index;
+}
+
+interface DiagnosticFieldControlProps {
+  field: DiagnosticField;
+  fieldKey: string;
+  value: DiagnosticFieldValue | undefined;
+  error?: string;
+  onChange: (key: string, value: DiagnosticFieldValue) => void;
+}
+
+function DiagnosticFieldControl({
+  field,
+  fieldKey,
+  value,
+  error,
+  onChange,
+}: DiagnosticFieldControlProps) {
+  const type = fieldType(field);
+
+  const label = (
+    <label className="diagnostic-field-label" htmlFor={fieldKey}>
+      <span>{field.prompt}</span>
+      {field.required && <strong aria-label="Campo obrigatório">Obrigatório</strong>}
+    </label>
+  );
+
+  if (type === 'single') {
+    return (
+      <div className={`diagnostic-field ${error ? 'has-error' : ''}`}>
+        {label}
+        <div className="diagnostic-choice-grid" role="radiogroup" aria-label={field.prompt}>
+          {(field.options ?? []).map((option) => {
+            const checked = valueAsText(value) === option;
+            return (
+              <button
+                key={option}
+                type="button"
+                className={`diagnostic-choice ${checked ? 'is-selected' : ''}`}
+                onClick={() => onChange(fieldKey, option)}
+                aria-pressed={checked}
+              >
+                <span className="diagnostic-choice-dot" aria-hidden />
+                <span>{option}</span>
+              </button>
+            );
+          })}
+        </div>
+        {error && <span className="diagnostic-error">{error}</span>}
+      </div>
+    );
+  }
+
+  if (type === 'multi') {
+    const selected = valueAsList(value);
+    return (
+      <div className={`diagnostic-field ${error ? 'has-error' : ''}`}>
+        {label}
+        <div className="diagnostic-choice-grid multi" role="group" aria-label={field.prompt}>
+          {(field.options ?? []).map((option) => {
+            const checked = selected.includes(option);
+            const next = checked ? selected.filter((item) => item !== option) : [...selected, option];
+            return (
+              <button
+                key={option}
+                type="button"
+                className={`diagnostic-choice ${checked ? 'is-selected' : ''}`}
+                onClick={() => onChange(fieldKey, next)}
+                aria-pressed={checked}
+              >
+                <span className="diagnostic-choice-check" aria-hidden>
+                  {checked && <Check size={13} />}
+                </span>
+                <span>{option}</span>
+              </button>
+            );
+          })}
+        </div>
+        {error && <span className="diagnostic-error">{error}</span>}
+      </div>
+    );
+  }
+
+  if (type === 'scale') {
+    const { min, max } = parseScaleBounds(field);
+    const textValue = valueAsText(value);
+    const current = Number(textValue || min);
+    const rangeMode = max > 10;
+
+    return (
+      <div className={`diagnostic-field ${error ? 'has-error' : ''}`}>
+        {label}
+        {rangeMode ? (
+          <div className="diagnostic-slider-wrap">
+            <input
+              id={fieldKey}
+              className="diagnostic-slider"
+              type="range"
+              min={min}
+              max={max}
+              step={5}
+              value={Number.isFinite(current) ? current : min}
+              onChange={(event) => onChange(fieldKey, event.target.value)}
+            />
+            <output className="diagnostic-slider-value" htmlFor={fieldKey}>
+              {textValue || min}
+            </output>
+          </div>
+        ) : (
+          <div className="diagnostic-scale-row" role="radiogroup" aria-label={field.prompt}>
+            {Array.from({ length: max - min + 1 }, (_, index) => String(min + index)).map((option) => {
+              const checked = textValue === option;
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  className={`diagnostic-scale-option ${checked ? 'is-selected' : ''}`}
+                  onClick={() => onChange(fieldKey, option)}
+                  aria-pressed={checked}
+                >
+                  {option}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <div className="diagnostic-scale-labels">
+          <span>{field.minLabel}</span>
+          <span>{field.maxLabel}</span>
+        </div>
+        {error && <span className="diagnostic-error">{error}</span>}
+      </div>
+    );
+  }
+
+  if (type === 'text') {
+    return (
+      <div className={`diagnostic-field ${error ? 'has-error' : ''}`}>
+        {label}
+        <input
+          id={fieldKey}
+          className="diagnostic-input"
+          value={valueAsText(value)}
+          onChange={(event) => onChange(fieldKey, event.target.value)}
+          placeholder={field.placeholder}
+        />
+        {error && <span className="diagnostic-error">{error}</span>}
+      </div>
+    );
+  }
+
+  return (
+    <div className={`diagnostic-field ${error ? 'has-error' : ''}`}>
+      {label}
+      <textarea
+        id={fieldKey}
+        className="diagnostic-textarea"
+        value={valueAsText(value)}
+        onChange={(event) => onChange(fieldKey, event.target.value)}
+        placeholder={field.placeholder}
+        rows={3}
+      />
+      {error && <span className="diagnostic-error">{error}</span>}
+    </div>
+  );
+}
+
+function DiagnosticCanvasPreview({ data }: { data: InitialFormData }) {
+  const tiles = [
+    {
+      label: 'Decoding',
+      value: getFirstAnswered(data, ['desafioPrincipal', 'organizacao', 'produtoServico']),
+    },
+    {
+      label: 'Gap Scan',
+      value: getFirstAnswered(data, ['criticidadeGap', 'distanciaAtualDesejado', 'desiredStateFuncionamento']),
+    },
+    {
+      label: 'System Scan',
+      value: getFirstAnswered(data, ['processosCriticos', 'processosGeramRetrabalhoErro', 'sistemaPremiaComportamento']),
+    },
+    {
+      label: 'Team Scan',
+      value: getFirstAnswered(data, ['trilhaProvavelTeamScan', 'hipotesesTeamScan', 'evidenciasHipotesesTeamScan']),
+    },
+    {
+      label: 'Solution Pick',
+      value: getFirstAnswered(data, ['solucaoSelecionadaDesign', 'bloqueioPrincipalResumo', 'quickWins30Dias']),
+    },
+  ];
+
+  return (
+    <section className="diagnostic-canvas-preview" aria-label="Prévia do Human-to-Business Canvas">
+      <div className="diagnostic-canvas-header">
+        <img src="/icone-magnusmind.svg" alt="" aria-hidden />
+        <div>
+          <p>Human-to-Business Canvas</p>
+          <span>Resumo executivo das 5 etapas</span>
+        </div>
+      </div>
+      <div className="diagnostic-canvas-grid">
+        {tiles.map((tile) => (
+          <article key={tile.label} className="diagnostic-canvas-tile">
+            <h3>{tile.label}</h3>
+            <p>{tile.value}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function PhaseNav({
+  activePhase,
+  data,
+  onSelect,
+}: {
+  activePhase: DiagnosticPhaseId;
+  data: InitialFormData;
+  onSelect: (phase: DiagnosticPhaseId) => void;
+}) {
+  const completion = getDiagnosticCompletion(data);
+
+  return (
+    <aside className="diagnostic-phase-nav" aria-label="Fases do diagnóstico">
+      <div className="diagnostic-phase-nav-header">
+        <span>Fase 1</span>
+        <strong>{completion.requiredPercent}% campos-chave</strong>
+      </div>
+      {DIAGNOSTIC_PHASES.map((phase) => {
+        const Icon = phaseIcons[phase.id];
+        const stat = completion.byPhase.find((item) => item.id === phase.id);
+        const complete = stat && stat.requiredTotal > 0 && stat.requiredAnswered === stat.requiredTotal;
+        const active = activePhase === phase.id;
+        return (
+          <button
+            key={phase.id}
+            type="button"
+            className={`diagnostic-phase-button ${active ? 'is-active' : ''}`}
+            onClick={() => onSelect(phase.id)}
+          >
+            <span className="diagnostic-phase-icon" aria-hidden>
+              <Icon size={18} />
+            </span>
+            <span className="diagnostic-phase-text">
+              <span>{phase.step}</span>
+              <strong>{phase.shortTitle}</strong>
+            </span>
+            <span className={`diagnostic-phase-status ${complete ? 'is-complete' : ''}`} aria-hidden>
+              {complete ? <CheckCircle2 size={15} /> : `${stat?.answered ?? 0}/${stat?.total ?? 0}`}
+            </span>
+          </button>
+        );
+      })}
+    </aside>
+  );
+}
+
+function PhaseHeader({
+  phase,
+  activeLens,
+  onLensChange,
+}: {
+  phase: DiagnosticPhase;
+  activeLens: DiagnosticLens;
+  onLensChange: (lens: DiagnosticLens) => void;
+}) {
+  const Icon = phaseIcons[phase.id];
+  return (
+    <header className="diagnostic-phase-hero">
+      <div className="diagnostic-phase-kicker">
+        <span>{phase.step}</span>
+        <span>{phase.subtitle}</span>
+      </div>
+      <div className="diagnostic-phase-title-row">
+        <div className="diagnostic-phase-large-icon" aria-hidden>
+          <Icon size={28} />
+        </div>
+        <div>
+          <h1>{phase.title}</h1>
+          <p>{phase.goal}</p>
+        </div>
+      </div>
+      {phase.principle && <blockquote>{phase.principle}</blockquote>}
+      {phase.id === 'teamScan' && (
+        <div className="diagnostic-lens-switch" aria-label="Lente de resposta do Team Scan">
+          {DIAGNOSTIC_LENSES.map((lens) => (
+            <button
+              key={lens.id}
+              type="button"
+              className={activeLens === lens.id ? 'is-active' : ''}
+              onClick={() => onLensChange(lens.id)}
+            >
+              <strong>{lens.label}</strong>
+              <span>{lens.hint}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </header>
+  );
+}
+
+function SolutionRulesPanel() {
+  return (
+    <section className="diagnostic-rules-panel" aria-label="Motor de regras Solution Pick">
+      <div className="diagnostic-rules-header">
+        <Target size={18} aria-hidden />
+        <div>
+          <h2>Motor de regras SE-ENTÃO</h2>
+          <p>Referência para a IA decidir o que resolver primeiro e o que evitar agora.</p>
+        </div>
+      </div>
+      <div className="diagnostic-rules-grid">
+        {SOLUTION_RULES.map((rule) => (
+          <article key={`${rule.metric}-${rule.trigger}`} className="diagnostic-rule">
+            <div>
+              <span>{rule.metric}</span>
+              <strong>{rule.trigger}</strong>
+            </div>
+            <p>{rule.logic}</p>
+            <small>{rule.avoid}</small>
+            <ul>
+              {rule.prioritize.slice(0, 3).map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 export function InitialFormPage() {
   const navigate = useNavigate();
   const [userId, setUserId] = useState<string | null>(null);
-  const [data, setData] = useState<InitialFormData>(empty);
-  const [errors, setErrors] = useState<Partial<Record<keyof InitialFormData, string>>>({});
+  const [data, setData] = useState<InitialFormData>(() => createEmptyDiagnosticData());
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
   const [completedAt, setCompletedAt] = useState<Date | null>(null);
+  const [draftUpdatedAt, setDraftUpdatedAt] = useState<Date | null>(null);
+  const [activePhaseId, setActivePhaseId] = useState<DiagnosticPhaseId>('decoding');
+  const [activeLens, setActiveLens] = useState<DiagnosticLens>('performer');
+  const [feedback, setFeedback] = useState<string | null>(null);
+
+  const activePhase = useMemo(
+    () => DIAGNOSTIC_PHASES.find((phase) => phase.id === activePhaseId) ?? DIAGNOSTIC_PHASES[0],
+    [activePhaseId]
+  );
+  const completion = useMemo(() => getDiagnosticCompletion(data), [data]);
+  const fieldPhaseIndex = useMemo(() => buildFieldPhaseIndex(), []);
+  const contextPreview = useMemo(() => buildDiagnosticContext(data), [data]);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setUserId(u?.uid ?? null));
@@ -30,30 +452,73 @@ export function InitialFormPage() {
 
   useEffect(() => {
     if (!userId) return;
+    let cancelled = false;
     setLoading(true);
     getInitialForm(userId)
-      .then(({ data: d, completedAt: at }) => {
-        setData(d);
+      .then(({ data: formData, completedAt: at, draftUpdatedAt: draftAt }) => {
+        if (cancelled) return;
+        setData(formData);
         setCompletedAt(at);
+        setDraftUpdatedAt(draftAt);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [userId]);
 
+  const setFieldValue = (key: string, value: DiagnosticFieldValue) => {
+    setData((prev) => ({ ...prev, [key]: value }));
+    setErrors((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    setFeedback(null);
+  };
+
   const validate = () => {
-    const e: Partial<Record<keyof InitialFormData, string>> = {};
-    if (!data.organizacao.trim()) e.organizacao = 'Este campo é obrigatório';
-    if (!data.produtoServico.trim()) e.produtoServico = 'Este campo é obrigatório';
-    if (!data.estagioNegocio) e.estagioNegocio = 'Selecione uma opção';
-    if (!data.fatoresExternos.trim()) e.fatoresExternos = 'Este campo é obrigatório';
-    if (!data.mudancasRecentes.trim()) e.mudancasRecentes = 'Este campo é obrigatório';
-    setErrors(e);
-    return Object.keys(e).length === 0;
+    const nextErrors: Record<string, string> = {};
+    for (const key of getRequiredDiagnosticFieldKeys()) {
+      if (!isDiagnosticValueAnswered(data[key])) {
+        nextErrors[key] = 'Preencha este campo para concluir o diagnóstico.';
+      }
+    }
+    setErrors(nextErrors);
+
+    const firstMissing = Object.keys(nextErrors)[0];
+    if (firstMissing) {
+      const phase = fieldPhaseIndex.get(firstMissing);
+      if (phase) setActivePhaseId(phase);
+      setFeedback('Ainda existem campos-chave pendentes antes de concluir o Human-to-Business Canvas.');
+      return false;
+    }
+    return true;
+  };
+
+  const handleDraft = async () => {
+    if (!userId || savingDraft) return;
+    setSavingDraft(true);
+    setFeedback(null);
+    try {
+      const at = await saveInitialFormDraft(userId, data);
+      setDraftUpdatedAt(at);
+      setFeedback('Rascunho salvo. A IA já poderá usar as respostas preenchidas quando você avançar.');
+    } catch {
+      setFeedback('Não foi possível salvar o rascunho. Tente novamente.');
+    } finally {
+      setSavingDraft(false);
+    }
   };
 
   const handleSubmit = async (ev: FormEvent) => {
     ev.preventDefault();
     if (!userId || !validate()) return;
     setSaving(true);
+    setFeedback(null);
     try {
       const at = await saveInitialForm(userId, data);
       setCompletedAt(at);
@@ -62,14 +527,14 @@ export function InitialFormPage() {
           postDiagnosticNotice: {
             title: 'Diagnóstico concluído com sucesso',
             message:
-              'Seu Human-to-Business Canvas foi salvo e o Hub já foi atualizado com os dados desta etapa.',
+              'Seu Human-to-Business Canvas foi salvo com as 5 etapas Magnus Waves e já pode orientar o MM Blueprint.',
             nextStepLabel: 'Próximo passo recomendado: Design (MM Blueprint)',
             completedAt: at.toISOString(),
           },
         },
       });
     } catch {
-      setErrors({ organizacao: 'Erro ao salvar. Tente novamente.' });
+      setFeedback('Erro ao salvar. Tente novamente.');
     } finally {
       setSaving(false);
     }
@@ -79,87 +544,151 @@ export function InitialFormPage() {
     return <p className="form-loading">Carregando diagnóstico...</p>;
   }
 
-  const textFields = DIAGNOSTIC_FIELD_STEPS.filter((s) => s.field !== 'estagioNegocio');
-  const stageStep = DIAGNOSTIC_FIELD_STEPS.find((s) => s.field === 'estagioNegocio')!;
-
   return (
-    <div className="form-container-inline">
-      <div className="form-card-inline">
-        <div className="form-logo">
-          <img src="/icone-magnusmind.svg" alt="" className="logo-icon" />
-          <p className="logo-text">magnus mind</p>
+    <form className="diagnostic-page" onSubmit={handleSubmit}>
+      <section className="diagnostic-topbar">
+        <div className="diagnostic-brand">
+          <img src="/icone-magnusmind.svg" alt="" aria-hidden />
+          <div>
+            <span>Magnus Waves</span>
+            <strong>Diagnóstico 1.1-1.5</strong>
+          </div>
         </div>
-        <h1 className="form-title">Onda 1 — Diagnóstico</h1>
-        <p className="form-timestamp" style={{ marginBottom: '0.5rem', textAlign: 'center' }}>
-          <strong>Human-to-Business Canvas™</strong> — meta: canvas desenhado ao final das 5 etapas
-        </p>
-        <p className="form-timestamp" style={{ marginBottom: '1rem', textAlign: 'center' }}>
-          Decoding → Gap Scan → System Scan → Team Scan → Solution Pick
-        </p>
-        {completedAt && (
-          <p className="form-timestamp">
-            Canvas atualizado em: <strong>{completedAt.toLocaleString('pt-BR')}</strong>
-          </p>
-        )}
-        <form className="initial-form" onSubmit={handleSubmit}>
-          {textFields.map((step, index) => {
-            const field = step.field;
-            if (field === 'estagioNegocio') return null;
-            return (
-              <div className="form-group" key={field}>
-                <span className="diagnostic-step-badge">{step.label}</span>
-                <label className="form-label">
-                  {index + 1}. {step.hint}
-                </label>
-                <textarea
-                  className={`form-textarea ${errors[field] ? 'input-error' : ''}`}
-                  rows={field === 'organizacao' ? 4 : 3}
-                  value={data[field]}
-                  onChange={(e) => setData({ ...data, [field]: e.target.value })}
-                  placeholder={
-                    field === 'organizacao'
-                      ? 'Empresa, mercado, posicionamento...'
-                      : undefined
-                  }
-                />
-                {errors[field] && <span className="error-message">{errors[field]}</span>}
-              </div>
-            );
-          })}
-
-          <fieldset className="form-group stage-fieldset">
-            <span className="diagnostic-step-badge">{stageStep.label}</span>
-            <legend className="form-label">3. {stageStep.hint}</legend>
-            <div className="radio-group">
-              {BUSINESS_STAGES.map((stage) => (
-                <label
-                  key={stage}
-                  className={`radio-option ${data.estagioNegocio === stage ? 'checked' : ''}`}
-                >
-                  <input
-                    type="radio"
-                    name="estagio"
-                    className="radio-input"
-                    value={stage}
-                    checked={data.estagioNegocio === stage}
-                    onChange={() => setData({ ...data, estagioNegocio: stage })}
-                  />
-                  <span className="radio-content">
-                    <span className="radio-label">{stage}</span>
-                    <span className="radio-description">{STAGE_DESCRIPTIONS[stage]}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
-            {errors.estagioNegocio && <span className="error-message">{errors.estagioNegocio}</span>}
-          </fieldset>
-
-          <button type="submit" className="btn-primary" disabled={saving}>
-            {saving ? 'Salvando canvas...' : 'Salvar Human-to-Business Canvas'}
-            <span className="btn-arrow">→</span>
+        <div className="diagnostic-progress-panel" aria-label="Progresso do diagnóstico">
+          <div>
+            <span>{completion.percent}%</span>
+            <p>preenchido</p>
+          </div>
+          <div>
+            <span>
+              {completion.requiredAnswered}/{completion.requiredTotal}
+            </span>
+            <p>campos-chave</p>
+          </div>
+          <div className="diagnostic-progress-bar" aria-hidden>
+            <span style={{ width: `${completion.requiredPercent}%` }} />
+          </div>
+        </div>
+        <div className="diagnostic-actions">
+          <button type="button" className="diagnostic-secondary-button" onClick={handleDraft} disabled={savingDraft}>
+            <Save size={16} aria-hidden />
+            {savingDraft ? 'Salvando...' : 'Salvar rascunho'}
           </button>
-        </form>
+          <button type="submit" className="diagnostic-primary-button" disabled={saving}>
+            <ClipboardCheck size={16} aria-hidden />
+            {saving ? 'Concluindo...' : 'Concluir canvas'}
+          </button>
+        </div>
+      </section>
+
+      {feedback && (
+        <div className="diagnostic-feedback" role="status">
+          <CircleAlert size={18} aria-hidden />
+          <span>{feedback}</span>
+        </div>
+      )}
+
+      <div className="diagnostic-workspace">
+        <PhaseNav activePhase={activePhaseId} data={data} onSelect={setActivePhaseId} />
+
+        <main className="diagnostic-main">
+          <PhaseHeader phase={activePhase} activeLens={activeLens} onLensChange={setActiveLens} />
+
+          {activePhase.id === 'solutionPick' && <SolutionRulesPanel />}
+
+          <div className="diagnostic-blocks">
+            {activePhase.blocks.map((block) => (
+              <section key={block.id} className="diagnostic-block">
+                <div className="diagnostic-block-header">
+                  <div>
+                    <span>{block.source ?? activePhase.subtitle}</span>
+                    <h2>{block.title}</h2>
+                    {block.description && <p>{block.description}</p>}
+                  </div>
+                  <small>{block.outputForAI}</small>
+                </div>
+                <div className="diagnostic-fields">
+                  {block.fields.map((field) => {
+                    const key = getFieldKey(field, activeLens);
+                    return (
+                      <DiagnosticFieldControl
+                        key={key}
+                        field={field}
+                        fieldKey={key}
+                        value={data[key]}
+                        error={errors[key]}
+                        onChange={setFieldValue}
+                      />
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
+          </div>
+        </main>
+
+        <aside className="diagnostic-inspector" aria-label="Resumo do diagnóstico">
+          <DiagnosticCanvasPreview data={data} />
+
+          <section className="diagnostic-deliverables">
+            <div className="diagnostic-inspector-title">
+              <FileText size={17} aria-hidden />
+              <h2>Output da fase</h2>
+            </div>
+            <ul>
+              {activePhase.deliverables.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="diagnostic-context-meter">
+            <div className="diagnostic-inspector-title">
+              <CheckCircle2 size={17} aria-hidden />
+              <h2>Contexto para IA</h2>
+            </div>
+            <p>
+              {contextPreview.length > 80
+                ? `${contextPreview.length.toLocaleString('pt-BR')} caracteres estruturados`
+                : 'Aguardando respostas para montar contexto consultivo.'}
+            </p>
+            {completedAt && (
+              <span>Concluído em {completedAt.toLocaleString('pt-BR')}</span>
+            )}
+            {!completedAt && draftUpdatedAt && (
+              <span>Rascunho salvo em {draftUpdatedAt.toLocaleString('pt-BR')}</span>
+            )}
+          </section>
+        </aside>
       </div>
-    </div>
+
+      <div className="diagnostic-bottom-actions">
+        <button
+          type="button"
+          className="diagnostic-secondary-button"
+          onClick={() => {
+            const currentIndex = DIAGNOSTIC_PHASES.findIndex((phase) => phase.id === activePhaseId);
+            const previous = DIAGNOSTIC_PHASES[Math.max(0, currentIndex - 1)];
+            setActivePhaseId(previous.id);
+          }}
+          disabled={activePhaseId === DIAGNOSTIC_PHASES[0].id}
+        >
+          Voltar fase
+        </button>
+        <button
+          type="button"
+          className="diagnostic-secondary-button"
+          onClick={() => {
+            const currentIndex = DIAGNOSTIC_PHASES.findIndex((phase) => phase.id === activePhaseId);
+            const next = DIAGNOSTIC_PHASES[Math.min(DIAGNOSTIC_PHASES.length - 1, currentIndex + 1)];
+            setActivePhaseId(next.id);
+          }}
+          disabled={activePhaseId === DIAGNOSTIC_PHASES[DIAGNOSTIC_PHASES.length - 1].id}
+        >
+          Próxima fase
+          <ArrowRight size={16} aria-hidden />
+        </button>
+      </div>
+    </form>
   );
 }

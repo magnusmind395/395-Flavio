@@ -1,39 +1,84 @@
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { createEmptyDiagnosticData, getAllDiagnosticFields, getFieldKeys } from '../constants/diagnosticFlow';
 import { db } from '../config/firebase';
-import type { InitialFormData } from '../types';
+import type { DiagnosticFieldValue, InitialFormData } from '../types';
 
 const COLLECTION = 'initialForms';
 
-const emptyForm: InitialFormData = {
-  organizacao: '',
-  produtoServico: '',
-  estagioNegocio: '',
-  fatoresExternos: '',
-  mudancasRecentes: '',
-};
+function normalizeFieldValue(raw: unknown, fallback: DiagnosticFieldValue): DiagnosticFieldValue {
+  if (Array.isArray(fallback)) {
+    return Array.isArray(raw) ? raw.map(String).filter(Boolean) : [];
+  }
+  if (Array.isArray(raw)) return raw.join(', ');
+  return raw == null ? '' : String(raw);
+}
+
+function normalizeFormData(raw: Record<string, unknown> | undefined): InitialFormData {
+  const empty = createEmptyDiagnosticData();
+  if (!raw) return empty;
+
+  const normalized = { ...empty };
+  for (const field of getAllDiagnosticFields()) {
+    for (const key of getFieldKeys(field)) {
+      normalized[key] = normalizeFieldValue(raw[key], empty[key]);
+    }
+  }
+
+  return {
+    ...normalized,
+    organizacao: String(normalized.organizacao ?? ''),
+    produtoServico: String(normalized.produtoServico ?? ''),
+    estagioNegocio: String(normalized.estagioNegocio ?? ''),
+    fatoresExternos: String(normalized.fatoresExternos ?? ''),
+    mudancasRecentes: String(normalized.mudancasRecentes ?? ''),
+  };
+}
 
 export async function getInitialForm(userId: string) {
   const ref = doc(db, COLLECTION, userId);
   const snap = await getDoc(ref);
   if (!snap.exists()) {
-    return { data: { ...emptyForm }, completedAt: null as Date | null };
+    return {
+      data: createEmptyDiagnosticData(),
+      completedAt: null as Date | null,
+      draftUpdatedAt: null as Date | null,
+    };
   }
+
   const raw = snap.data();
   const completedAt = raw.completedAt?.toDate?.() ?? null;
+  const draftUpdatedAt = raw.draftUpdatedAt?.toDate?.() ?? raw.updatedAt?.toDate?.() ?? null;
+
   return {
-    data: {
-      organizacao: raw.organizacao ?? '',
-      produtoServico: raw.produtoServico ?? '',
-      estagioNegocio: raw.estagioNegocio ?? '',
-      fatoresExternos: raw.fatoresExternos ?? '',
-      mudancasRecentes: raw.mudancasRecentes ?? '',
-    },
+    data: normalizeFormData(raw),
     completedAt,
+    draftUpdatedAt,
   };
+}
+
+export async function saveInitialFormDraft(userId: string, data: InitialFormData) {
+  const ref = doc(db, COLLECTION, userId);
+  await setDoc(
+    ref,
+    {
+      ...data,
+      draftUpdatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+  return new Date();
 }
 
 export async function saveInitialForm(userId: string, data: InitialFormData) {
   const ref = doc(db, COLLECTION, userId);
-  await setDoc(ref, { ...data, completedAt: serverTimestamp() });
+  await setDoc(
+    ref,
+    {
+      ...data,
+      completedAt: serverTimestamp(),
+      draftUpdatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
   return new Date();
 }

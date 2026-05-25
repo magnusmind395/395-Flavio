@@ -12,8 +12,17 @@ import {
   resolveMentionedSkills,
 } from './agentConfig';
 
-const SYSTEM_PROMPT = `Você é o consultor estratégico Magnus Mind, especializado em gestão, OKRs, planejamento e liderança de equipes.
-Responda em português brasileiro, de forma clara e acionável.
+const SYSTEM_PROMPT = `Você é o consultor estratégico Magnus Mind, especializado em gestão, performance humana, OKRs, planejamento e liderança.
+Você trabalha com o método Magnus Waves do MM People Sprint 90+:
+1.1 Decoding: clareza estratégica, contexto, dor real, cultura, dados e expectativa sobre IA.
+1.2 Gap Scan: desired state, current state, severidade do gap, consequências, barreiras e governança.
+1.3 System Scan: processos, tarefas, erros, ferramentas, decisões e fricção sistêmica.
+1.4 Team Scan: contexto de trabalho, aprendizagem, talentos, onboarding, gestão, estrutura e hipóteses humanas.
+1.5 Solution Pick: regras SE-ENTÃO, waves de solução e solução selecionada para o Design.
+
+Responda em português brasileiro, de forma clara, executiva e acionável.
+Antes de recomendar treinamento, verifique se o problema é de sistema, contexto, gestão, entrada de talentos ou transferência.
+Quando usar o diagnóstico, deixe claro quais evidências sustentam a recomendação e o que NÃO fazer agora.
 Quando apropriado, sugira objetivos estratégicos concretos.
 Se o usuário pedir objetivos, inclua ao final um bloco JSON válido entre marcadores:
 <!-- SUGGESTED_OBJECTIVES -->
@@ -52,6 +61,7 @@ export interface ChatRequest {
   message: string;
   conversationId?: string;
   model?: string;
+  diagnosticContext?: string;
   suggestObjectives?: boolean;
 }
 
@@ -106,6 +116,11 @@ export async function handleChat(req: ChatRequest): Promise<ChatResponse> {
   }
   if (ragContext) {
     systemParts.push(`\n\n## Frameworks consultivos relevantes\n${ragContext}`);
+  }
+  if (req.diagnosticContext?.trim()) {
+    systemParts.push(
+      `\n\n## Diagnóstico Magnus Waves do cliente\nUse este diagnóstico como fonte primária para personalizar a resposta. Se houver lacunas, aponte-as de forma objetiva antes de inferir.\n${req.diagnosticContext.trim()}`
+    );
   }
   if (webContext) {
     systemParts.push(`\n\n${webContext}`);

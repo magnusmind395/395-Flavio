@@ -43,7 +43,7 @@ router.get('/conversations/:id', async (req: Request, res: Response, next: NextF
 
 router.post('/chat', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { conversationId, model, suggestObjectives } = req.body;
+    const { conversationId, model, suggestObjectives, diagnosticContext } = req.body;
     const message = req.body.message ?? req.body.content;
 
     if (!message || typeof message !== 'string') {
@@ -55,6 +55,7 @@ router.post('/chat', async (req: Request, res: Response, next: NextFunction) => 
       message,
       conversationId,
       model,
+      diagnosticContext: typeof diagnosticContext === 'string' ? diagnosticContext : undefined,
       suggestObjectives: Boolean(suggestObjectives),
     });
 

@@ -4,6 +4,39 @@ Arquitetura híbrida: **Netlify** (frontend) + **Render** (backend/API).
 
 ## Frontend (Netlify)
 
+### Novo site / nova conta Netlify
+
+Se o deploy antigo (`395-flavio2.netlify.app` ou outra conta) não reflete o código atual, **crie um site novo** — não é obrigatório apagar o antigo.
+
+1. Acesse [app.netlify.com](https://app.netlify.com) com a **conta correta** (ou crie uma nova).
+2. **Add new project** → **Import an existing project** → **GitHub**.
+3. Autorize o GitHub e escolha o repositório: `lucasmonteiro9996/395-Flavio`.
+4. Branch: `main`.
+5. Confirme (o `netlify.toml` na raiz já define build e publish):
+
+| Campo | Valor |
+|-------|--------|
+| Build command | `npm run build` |
+| Publish directory | `dist` |
+
+6. **Site configuration → Environment variables** — adicione todas abaixo (ou use os valores de `.env.production` no repo).
+
+7. **Deploy site** e anote a URL gerada (ex.: `https://nome-aleatorio.netlify.app`).
+
+8. **Firebase Console** → projeto `magnusmind-d42ec` → **Authentication** → **Settings** → **Authorized domains** → adicione o domínio Netlify novo (sem `https://`).
+
+9. **Render** (API) → variável `CORS_ORIGIN` → inclua a URL nova do Netlify, separada por vírgula:
+   ```
+   https://SEU-SITE.netlify.app,https://395-flavio2.netlify.app,http://localhost:5173
+   ```
+   Salve e faça **Manual Deploy** no Render se necessário.
+
+10. (Opcional) **Domain management** no Netlify → domínio customizado (ex. `app.magnusmind.io`).
+
+O arquivo `netlify.toml` na raiz já cuida do redirect SPA (`/*` → `index.html`).
+
+### Variáveis obrigatórias no Netlify
+
 1. Conecte o repositório no [Netlify](https://app.netlify.com).
 2. Build command: `npm run build`
 3. Publish directory: `dist`
@@ -12,7 +45,13 @@ Arquitetura híbrida: **Netlify** (frontend) + **Render** (backend/API).
 | Variável | Exemplo |
 |----------|---------|
 | `VITE_API_BASE_URL` | `https://three95-flavio.onrender.com` |
-| `VITE_FIREBASE_*` | Credenciais do projeto Firebase |
+| `VITE_FIREBASE_API_KEY` | ver `.env.production` |
+| `VITE_FIREBASE_AUTH_DOMAIN` | `magnusmind-d42ec.firebaseapp.com` |
+| `VITE_FIREBASE_PROJECT_ID` | `magnusmind-d42ec` |
+| `VITE_FIREBASE_STORAGE_BUCKET` | `magnusmind-d42ec.firebasestorage.app` |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | `981919789399` |
+| `VITE_FIREBASE_APP_ID` | `1:981919789399:web:46f31e0ad8e164f54e8e12` |
+| `VITE_FIREBASE_MEASUREMENT_ID` | `G-5QHZ9D7E9V` |
 
 O arquivo `netlify.toml` já configura SPA redirects (`/*` → `index.html`).
 

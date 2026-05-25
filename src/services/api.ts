@@ -74,7 +74,7 @@ export const aiApi = {
     ),
   conversation: (id: string) =>
     api.get(`/api/ai/conversations/${id}`).then((r) => normalizeConversationDetail(r.data)),
-  chat: (data: { conversationId?: string; content: string; modelId?: string }) =>
+  chat: (data: { conversationId?: string; content: string; modelId?: string; diagnosticContext?: string }) =>
     withUserId((userId) =>
       api
         .post(
@@ -84,6 +84,7 @@ export const aiApi = {
             message: data.content,
             conversationId: data.conversationId,
             model: data.modelId,
+            diagnosticContext: data.diagnosticContext,
             userId: userId || undefined,
           },
           { timeout: CHAT_TIMEOUT }

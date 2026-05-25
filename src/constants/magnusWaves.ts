@@ -1,4 +1,4 @@
-/** Fluxo oficial do Miro — MM People Sprint 90+ / Magnus Waves™ */
+/** Fluxo oficial do Miro - MM People Sprint 90+ / Magnus Waves */
 
 import type { InitialFormData } from '../types';
 
@@ -25,14 +25,14 @@ export const MAGNUS_WAVES: MagnusWave[] = [
     id: 'diagnostico',
     number: 1,
     label: 'Diagnóstico',
-    subtitle: 'Human-to-Business Canvas™',
+    subtitle: 'Human-to-Business Canvas',
     miroRef: 'Canvas desenhado ao final das 5 etapas',
     route: '/dashboard/initial-form',
     steps: [
       { id: '1.1', label: 'Decoding', description: 'Decodificar contexto e valor' },
-      { id: '1.2', label: 'Gap Scan', description: 'Onde está vs. onde precisa chegar' },
-      { id: '1.3', label: 'System Scan', description: 'Problemas de sistema' },
-      { id: '1.4', label: 'Team Scan', description: 'Dinâmica e gaps humanos' },
+      { id: '1.2', label: 'Gap Scan', description: 'Onde está versus onde precisa chegar' },
+      { id: '1.3', label: 'System Scan', description: 'Processos, dados, decisões e fricções' },
+      { id: '1.4', label: 'Team Scan', description: 'Gaps humanos, gestão e colaboração' },
       { id: '1.5', label: 'Solution Pick', description: 'Escolha da solução certa' },
     ],
   },
@@ -41,7 +41,7 @@ export const MAGNUS_WAVES: MagnusWave[] = [
     number: 2,
     label: 'Design',
     subtitle: 'MM Blueprint',
-    miroRef: 'Caminho A: Outcome Forge → Build → Impact Evaluation',
+    miroRef: 'Caminho A: Outcome Forge -> Build -> Impact Evaluation',
     route: '/dashboard/consultoria-ia',
     steps: [
       { id: '2.0', label: 'MM Blueprint', description: 'Estruturar a solução na ordem certa' },
@@ -55,11 +55,11 @@ export const MAGNUS_WAVES: MagnusWave[] = [
     number: 3,
     label: 'Difusão',
     subtitle: 'Make the Move',
-    miroRef: '4 WS → Imprint → Follow-up',
+    miroRef: '4 WS -> Imprint -> Follow-up',
     route: '/dashboard/objetivos',
     steps: [
       { id: '3.0', label: 'Make the Move', description: 'Tirar do papel e colocar em movimento' },
-      { id: '3.1', label: '4 WS', description: 'Workshops / ritmo de execução' },
+      { id: '3.1', label: '4 WS', description: 'Workshops e ritmo de execução' },
       { id: '3.2', label: 'Imprint', description: 'Imprimir comportamento na rotina' },
       { id: '3.3', label: 'Follow-up', description: 'Acompanhar com dono e prazo' },
     ],
@@ -79,7 +79,6 @@ export const MAGNUS_WAVES: MagnusWave[] = [
   },
 ];
 
-/** Campos do formulário → etapas do canvas (Miro) */
 export const DIAGNOSTIC_FIELD_STEPS: {
   field: keyof InitialFormData;
   stepId: string;
@@ -100,21 +99,39 @@ export const DIAGNOSTIC_FIELD_STEPS: {
   },
   {
     field: 'estagioNegocio',
+    stepId: '1.1',
+    label: '1.1 Decoding (estágio)',
+    hint: 'Estágio atual do negócio',
+  },
+  {
+    field: 'desafioPrincipal',
+    stepId: '1.1',
+    label: '1.1 Need Statement',
+    hint: 'Dor real que motivou a jornada',
+  },
+  {
+    field: 'desiredStateFuncionamento',
     stepId: '1.2',
     label: '1.2 Gap Scan',
-    hint: 'Onde o negócio está hoje',
+    hint: 'Estado desejado versus estado atual',
   },
   {
-    field: 'fatoresExternos',
+    field: 'processosCriticos',
     stepId: '1.3',
     label: '1.3 System Scan',
-    hint: 'Fatores externos e de sistema',
+    hint: 'Processos e fricções sistêmicas',
   },
   {
-    field: 'mudancasRecentes',
+    field: 'hipotesesTeamScan',
     stepId: '1.4',
-    label: '1.4 Team Scan → 1.5 Solution Pick',
-    hint: 'Mudanças recentes e o que exige nova forma de operar',
+    label: '1.4 Team Scan',
+    hint: 'Causas humanas prováveis',
+  },
+  {
+    field: 'solucaoSelecionadaDesign',
+    stepId: '1.5',
+    label: '1.5 Solution Pick',
+    hint: 'Solução selecionada para o Design',
   },
 ];
 

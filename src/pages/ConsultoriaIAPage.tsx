@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../config/firebase';
+import { buildDiagnosticContext } from '../constants/diagnosticFlow';
 import { getInitialForm } from '../services/initialForm';
 import ReactMarkdown from 'react-markdown';
 import {
@@ -21,12 +22,12 @@ import {
   Zap,
 } from 'lucide-react';
 import { agentApi, aiApi, type AgentSkillDto } from '../services/api';
-import type { ChatMessage } from '../types';
+import type { ChatMessage, InitialFormData } from '../types';
 
 const SUGGESTIONS = [
-  'MM Blueprint: qual outcome devo forjar primeiro (2.1 Outcome Forge)?',
-  'O que construir na ordem certa antes de mover a equipe (2.2 Build)?',
-  'Como avaliar impacto antes de escalar (2.3 Impact Evaluation)?',
+  'Com base no diagnóstico 1.1-1.5, qual solução deve entrar primeiro no MM Blueprint?',
+  'Quais ações devo evitar agora segundo o Solution Pick?',
+  'Monte um roadmap 0-30, 30-90 e 90-180 dias a partir do canvas.',
 ];
 
 interface AiModel {
@@ -89,6 +90,7 @@ export function ConsultoriaIAPage() {
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const [diagnosticComplete, setDiagnosticComplete] = useState<boolean | null>(null);
+  const [diagnosticData, setDiagnosticData] = useState<InitialFormData | null>(null);
   const [skills, setSkills] = useState<AgentSkillDto[]>([]);
   const [skillMenuOpen, setSkillMenuOpen] = useState(false);
   const [skillSearch, setSkillSearch] = useState('');
@@ -163,8 +165,14 @@ export function ConsultoriaIAPage() {
         return;
       }
       getInitialForm(user.uid)
-        .then(({ completedAt }) => setDiagnosticComplete(!!completedAt))
-        .catch(() => setDiagnosticComplete(false));
+        .then(({ data, completedAt }) => {
+          setDiagnosticComplete(!!completedAt);
+          setDiagnosticData(data);
+        })
+        .catch(() => {
+          setDiagnosticComplete(false);
+          setDiagnosticData(null);
+        });
     });
     return unsub;
   }, []);
@@ -249,6 +257,7 @@ export function ConsultoriaIAPage() {
         conversationId: activeId || undefined,
         content,
         modelId: selectedModel || undefined,
+        diagnosticContext: diagnosticData ? buildDiagnosticContext(diagnosticData) : undefined,
       });
 
       const convId = result.conversationId as string;
