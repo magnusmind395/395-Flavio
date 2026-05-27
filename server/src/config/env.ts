@@ -6,14 +6,24 @@ dotenv.config();
 function normalizePrivateKey(raw: string | undefined): string | undefined {
   if (!raw?.trim()) return undefined;
   let key = raw.trim();
+  // BOM (alguns editores ao colar no painel)
+  if (key.charCodeAt(0) === 0xfeff) {
+    key = key.slice(1).trim();
+  }
+  // Aspas curvas / tipográficas → ASCII (quebram o PEM)
+  key = key.replace(/[\u201c\u201d\u201e]/g, '"').replace(/[\u2018\u2019]/g, "'");
   if (
     (key.startsWith('"') && key.endsWith('"')) ||
     (key.startsWith("'") && key.endsWith("'"))
   ) {
     key = key.slice(1, -1);
   }
-  key = key.replace(/\\n/g, '\n').replace(/\r\n/g, '\n');
-  return key;
+  key = key.replace(/\\n/g, '\n').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  // JSON duplo: "\\n" ainda como dois caracteres após primeira passada
+  if (!key.includes('\n') && key.includes('\\n')) {
+    key = key.replace(/\\n/g, '\n');
+  }
+  return key.trim();
 }
 
 function parseCorsOrigins(): string | string[] {
@@ -34,7 +44,7 @@ export const env = {
     privateKey: normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY),
   },
   openrouter: {
-    apiKey: process.env.OPENROUTER_API_KEY,
+    apiKey: process.env.OPENROUTER_API_KEY?.trim() || undefined,
     defaultModel: process.env.OPENROUTER_DEFAULT_MODEL ?? 'openai/gpt-4o-mini',
     siteUrl: process.env.OPENROUTER_SITE_URL ?? 'https://magnusmind.app',
     appName: process.env.OPENROUTER_APP_NAME ?? 'Magnus Mind',

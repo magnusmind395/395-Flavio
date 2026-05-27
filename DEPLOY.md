@@ -96,7 +96,7 @@ Configure variáveis `VITE_*` no painel do site criado (**Site configuration →
 
 | Variável | Exemplo |
 |----------|---------|
-| `VITE_API_BASE_URL` | `https://three95-flavio.onrender.com` |
+| `VITE_API_BASE_URL` | URL do **Web Service** no Render (ex.: `https://three95-flavio-fcha.onrender.com` — confira no painel; o nome do host muda se recriar o serviço) |
 | `VITE_FIREBASE_API_KEY` | ver `.env.production` |
 | `VITE_FIREBASE_AUTH_DOMAIN` | `magnusmind-d42ec.firebaseapp.com` |
 | `VITE_FIREBASE_PROJECT_ID` | `magnusmind-d42ec` |
@@ -137,6 +137,13 @@ Configure regras do Firestore para que cada usuário leia/escreva apenas o próp
 4. **Não** cole com Enter quebrando linha no painel do Render.
 5. **Não** use `GOOGLE_APPLICATION_CREDENTIALS` no Render Free.
 6. Salve → **Save and deploy**.
+
+**Erro `DECODER routines::unsupported` ao iniciar a API:** o Node não conseguiu ler o PEM da `FIREBASE_PRIVATE_KEY`. Confira:
+
+- Cole **só** o valor de `private_key` do JSON do Firebase (inclui `-----BEGIN PRIVATE KEY-----` … `-----END PRIVATE KEY-----`), não o JSON inteiro.
+- **Uma linha** no Render, com `\n` no meio como no JSON original (não quebre o PEM com Enter no painel).
+- **Aspas retas** `"..."` em volta do valor inteiro são aceitas; evite copiar de Word/PDF (aspas curvas `“` corrompem o PEM — o servidor tenta normalizar, mas o ideal é colar do JSON bruto).
+- Gere **nova chave** no Firebase (Service accounts → Generate new private key) se suspeitar de truncamento ou edição manual.
 
 Ou use o blueprint `render.yaml` na raiz do repositório (Render → Blueprint).
 

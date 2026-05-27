@@ -1,37 +1,73 @@
 /* Consultoria IA — layout responsivo (sidebar + histórico + chat)
  *
- * index.css fixa .consultoria-ia { height:100%; min-height:100%; overflow:hidden }
- * e .consultoria-container / .chat-main { height:100%; overflow:hidden }.
- * Isso trava a altura no viewport do <main>, corta o Gate Zero e impede o scroll
- * vertical de crescer com o conteúdo. Aqui sobrescrevemos para fluxo em coluna
- * com altura automática e scroll no .dashboard-main.consultoria-ia-active.
+ * O <main> do dashboard é flex column com altura limitada. Esta página preenche
+ * o espaço restante (flex:1; min-height:0) e mantém scroll interno em
+ * .history-list e .chat-messages — a lista de conversas não aumenta a altura
+ * da página inteira.
  */
 
 .consultoria-ia {
   box-sizing: border-box;
   width: 100%;
-  flex: 0 0 auto;
-  height: auto !important;
-  min-height: 0 !important;
-  max-height: none !important;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 100%;
   display: flex;
   flex-direction: column;
-  overflow: visible !important;
+  overflow: hidden;
   position: relative;
   margin: 0;
   padding: 0;
 }
 
+.consultoria-ia > .gate-zero-panel,
+.consultoria-ia > .consultoria-gate-banner {
+  flex-shrink: 0;
+}
+
+/* Fluxo em duas fases: só tela de escolhas Gate Zero (scroll na página) */
+.consultoria-ia.consultoria-ia--gate-phase {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.consultoria-ia.consultoria-ia--gate-phase > .gate-zero-panel {
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  box-sizing: border-box;
+}
+
+.chat-gate-revisit-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.65rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid rgba(96, 165, 250, 0.35);
+  background: rgba(74, 158, 255, 0.08);
+  color: var(--accent-blue, #4a9eff);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.chat-gate-revisit-button:hover {
+  background: rgba(74, 158, 255, 0.14);
+}
+
 .consultoria-container {
   flex: 1 1 auto;
-  min-height: min(360px, 48dvh);
+  min-height: 0;
   min-width: 0;
   width: 100%;
   display: flex;
   flex-direction: row;
-  height: auto !important;
-  max-height: none !important;
-  overflow: visible !important;
+  align-items: stretch;
+  overflow: hidden;
   position: relative;
 }
 
@@ -41,7 +77,6 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  height: auto !important;
   overflow: hidden;
   position: relative;
 }
@@ -333,6 +368,24 @@
   max-width: min(85%, 560px);
 }
 
+/* Dashboard main quando Consultoria IA ativa (antes dos media queries que ajustam padding) */
+.dashboard-main-wrapper.consultoria-ia-active,
+.dashboard-main.consultoria-ia-active {
+  min-height: 0;
+  height: 100%;
+}
+
+.dashboard-main.consultoria-ia-active {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0 !important;
+  overflow: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
 /* Histórico: drawer em telas médias (sidebar do dashboard + histórico = estreito) */
 @media (max-width: 1280px) {
   .history-toggle {
@@ -443,25 +496,26 @@
   }
 }
 
-/* Dashboard main quando Consultoria IA ativa */
-.dashboard-main-wrapper.consultoria-ia-active,
-.dashboard-main.consultoria-ia-active {
-  min-height: 0;
-  height: 100%;
-}
-
-.dashboard-main.consultoria-ia-active {
-  display: flex;
-  flex-direction: column;
-  padding: 0 !important;
-  overflow-x: hidden;
-  overflow-y: auto !important;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior-y: contain;
-}
-
 @media (min-width: 1281px) {
   .history-toggle {
     display: none !important;
+  }
+
+  /* Coluna do histórico: altura da linha (viewport − Gate), scroll na lista */
+  .consultoria-container .chat-history-sidebar {
+    align-self: stretch;
+    min-height: 0;
+    height: auto;
+    max-height: none;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .consultoria-container .history-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 }

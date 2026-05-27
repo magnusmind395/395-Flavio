@@ -25,7 +25,7 @@ export const AI_MODELS = [
 ];
 
 export async function chatCompletion(options: ChatCompletionOptions): Promise<string> {
-  const apiKey = env.openrouter.apiKey;
+  const apiKey = env.openrouter.apiKey?.trim();
   if (!apiKey) {
     throw new AppError(
       503,
@@ -64,7 +64,30 @@ export async function chatCompletion(options: ChatCompletionOptions): Promise<st
   } catch (err) {
     if (err instanceof AppError) throw err;
     if (axios.isAxiosError(err)) {
-      const msg = err.response?.data?.error?.message ?? err.message;
+      const body = err.response?.data as { error?: { message?: string } } | undefined;
+      const bodyMsg =
+        typeof body?.error?.message === 'string'
+          ? body.error.message
+          : typeof err.response?.data === 'object' &&
+              err.response?.data !== null &&
+              'message' in err.response.data
+            ? String((err.response.data as { message?: string }).message)
+            : '';
+      const msg = bodyMsg || err.message;
+      const lower = msg.toLowerCase();
+      if (
+        err.response?.status === 401 ||
+        lower.includes('missing authentication') ||
+        lower.includes('invalid api key') ||
+        lower.includes('no auth') ||
+        lower.includes('incorrect api key')
+      ) {
+        throw new AppError(
+          503,
+          'OpenRouter: chave ausente ou rejeitada. No Render, defina OPENROUTER_API_KEY no Web Service da API (variáveis de ambiente do backend — não no Netlify).',
+          'OPENROUTER_NOT_CONFIGURED'
+        );
+      }
       throw new AppError(err.response?.status ?? 502, `OpenRouter error: ${msg}`, 'OPENROUTER_ERROR');
     }
     throw err;

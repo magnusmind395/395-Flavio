@@ -197,7 +197,7 @@ Responda em JSON conceitual:
 
 Regra: ${GATE_ZERO_RULE}`;
 
-/** Skill slugs sugeridos para BlueprintConfigPage */
+/** Skill slugs sugeridos para menções /slug no chat (agente) */
 export const BLUEPRINT_SKILL_SLUGS = {
   gateZero: 'blueprint-gate-zero',
   outcomeForgeA: 'outcome-forge',

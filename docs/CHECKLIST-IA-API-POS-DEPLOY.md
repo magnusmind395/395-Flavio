@@ -26,7 +26,7 @@ Use após merge/deploy para validar **Consultoria IA**, **Gate Zero** e **OpenRo
 
 ### Rotas críticas (produção)
 
-Substitua `BASE` pela URL do serviço (ex.: `https://three95-flavio.onrender.com`).
+Substitua `BASE` pela URL exata do seu serviço no Render (painel → Web Service → copiar no topo), ex.: `https://three95-flavio-fcha.onrender.com`.
 
 | Verificação | Esperado |
 |---------------|----------|

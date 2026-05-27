@@ -4,7 +4,7 @@ Documento de validação do que foi implementado na plataforma.
 
 **Repositório:** https://github.com/lucasmonteiro9996/395-Flavio  
 **Frontend (Netlify):** https://395-flavio2.netlify.app  
-**API (Render):** https://three95-flavio.onrender.com  
+**API (Render):** use a URL do seu Web Service (ex.: `https://three95-flavio-fcha.onrender.com`).
 
 ---
 
@@ -251,8 +251,8 @@ npm install && npm run dev
 Acesse: **http://localhost:5173** (não abra `localhost:3001` no navegador — essa é só a API).
 
 Teste da API no Render:
-- https://three95-flavio.onrender.com/
-- https://three95-flavio.onrender.com/api/health
+- `https://<seu-servico>.onrender.com/`
+- `https://<seu-servico>.onrender.com/api/health`
 
 ---
 

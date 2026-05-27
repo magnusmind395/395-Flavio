@@ -23,7 +23,7 @@ depois: .\scripts\deploy.ps1
 Site: https://melodic-cupcake-80e777.netlify.app
 
 === PASSO C — TESTE ===
-https://three95-flavio.onrender.com/api/health
+https://SEU-SERVICO.onrender.com/api/health
 https://melodic-cupcake-80e777.netlify.app/login
 demo@magnusmind.app / MagnusMind2026!
 

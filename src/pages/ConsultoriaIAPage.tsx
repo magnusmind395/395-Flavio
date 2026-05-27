@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { buildDiagnosticContext } from '../constants/diagnosticFlow';
 import { buildGateContextAppendix } from '../constants/blueprintFlow';
 import { getInitialForm } from '../services/initialForm';
+import { resolveConsultoriaUiPhase, writeConsultoriaGateUiPhase } from '../constants/consultoriaGateUi';
 import { getBlueprintGate, type BlueprintGateDoc } from '../services/blueprintGate';
 import { GateZeroPanel } from '../components/GateZeroPanel';
 import ReactMarkdown from 'react-markdown';
@@ -12,11 +13,11 @@ import {
   Bot,
   ChevronRight,
   Clock,
+  GitBranch,
   MessageSquare,
   Pencil,
   Plus,
   Send,
-  Settings2,
   Sparkles,
   Target,
   User,
@@ -78,7 +79,6 @@ function mapMessages(raw: ServerMessage[], conversationId: string): ChatMessage[
 }
 
 export function ConsultoriaIAPage() {
-  const navigate = useNavigate();
   const [models, setModels] = useState<AiModel[]>([]);
   const [conversations, setConversations] = useState<ConvSummary[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -97,6 +97,8 @@ export function ConsultoriaIAPage() {
   const [diagnosticData, setDiagnosticData] = useState<InitialFormData | null>(null);
   const [gateDoc, setGateDoc] = useState<BlueprintGateDoc | null>(null);
   const [gateLoading, setGateLoading] = useState(false);
+  /** Com diagnóstico completo: `gate` = só tela Gate Zero; `chat` = só chat (persistido por utilizador). */
+  const [uiPhase, setUiPhase] = useState<'gate' | 'chat'>('chat');
   const [skills, setSkills] = useState<AgentSkillDto[]>([]);
   const [skillMenuOpen, setSkillMenuOpen] = useState(false);
   const [skillSearch, setSkillSearch] = useState('');
@@ -168,6 +170,7 @@ export function ConsultoriaIAPage() {
     const unsub = onAuthStateChanged(auth, (user) => {
       if (!user) {
         setDiagnosticComplete(null);
+        setUiPhase('chat');
         return;
       }
       getInitialForm(user.uid)
@@ -177,12 +180,19 @@ export function ConsultoriaIAPage() {
           if (completedAt) {
             setGateLoading(true);
             getBlueprintGate(user.uid)
-              .then((g) => setGateDoc(g))
-              .catch(() => setGateDoc(null))
+              .then((g) => {
+                setGateDoc(g);
+                setUiPhase(resolveConsultoriaUiPhase(user.uid, g));
+              })
+              .catch(() => {
+                setGateDoc(null);
+                setUiPhase('gate');
+              })
               .finally(() => setGateLoading(false));
           } else {
             setGateDoc(null);
             setGateLoading(false);
+            setUiPhase('chat');
           }
         })
         .catch(() => {
@@ -190,6 +200,7 @@ export function ConsultoriaIAPage() {
           setDiagnosticData(null);
           setGateDoc(null);
           setGateLoading(false);
+          setUiPhase('chat');
         });
     });
     return unsub;
@@ -202,6 +213,32 @@ export function ConsultoriaIAPage() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, loading]);
+
+  const handleGateDocChange = useCallback((doc: BlueprintGateDoc | null) => {
+    setGateDoc(doc);
+    const has = Boolean(doc?.selectedPath || doc?.skipped);
+    if (!doc || !has) {
+      setUiPhase('gate');
+    }
+  }, []);
+
+  const commitToChatPhase = useCallback(() => {
+    const uid = auth.currentUser?.uid;
+    if (uid) writeConsultoriaGateUiPhase(uid, 'chat');
+    setUiPhase('chat');
+  }, []);
+
+  const openGateRevision = useCallback(() => {
+    const uid = auth.currentUser?.uid;
+    if (uid) writeConsultoriaGateUiPhase(uid, 'gate');
+    setUiPhase('gate');
+  }, []);
+
+  const cancelGateRevision = useCallback(() => {
+    const uid = auth.currentUser?.uid;
+    if (uid) writeConsultoriaGateUiPhase(uid, 'chat');
+    setUiPhase('chat');
+  }, []);
 
   const loadConversations = useCallback(async () => {
     const data = await aiApi.conversations();
@@ -357,8 +394,20 @@ export function ConsultoriaIAPage() {
 
   const chatTitle = activeConv?.title || titleDraft || 'Consultoria IA';
 
+  const showConsultoriaGate = diagnosticComplete === true && (gateLoading || uiPhase === 'gate');
+  const showConsultoriaChat =
+    diagnosticComplete !== true || (!gateLoading && uiPhase === 'chat');
+  const gateRevisionMode =
+    !gateLoading &&
+    uiPhase === 'gate' &&
+    Boolean(gateDoc?.selectedPath || gateDoc?.skipped);
+
   return (
-    <div className="consultoria-ia">
+    <div
+      className={`consultoria-ia${
+        showConsultoriaGate && !gateLoading ? ' consultoria-ia--gate-phase' : ''
+      }`}
+    >
       {diagnosticComplete === false && (
         <div className="consultoria-gate-banner" style={{ margin: '0 1rem 0', maxWidth: 1200 }}>
           Complete o <strong>Human-to-Business Canvas</strong> (Onda 1 — Diagnóstico) antes do MM
@@ -366,23 +415,21 @@ export function ConsultoriaIAPage() {
           <Link to="/dashboard/initial-form">Ir para o diagnóstico</Link>
         </div>
       )}
-      {diagnosticComplete === true && (
+      {showConsultoriaGate && (
         <GateZeroPanel
           diagnosticContext={
             diagnosticData ? buildDiagnosticContext(diagnosticData) : ''
           }
           gateDoc={gateDoc}
           gateLoading={gateLoading}
-          onGateDocChange={setGateDoc}
-          onScrollToChat={() => {
-            document.getElementById('consultoria-chat-anchor')?.scrollIntoView({
-              behavior: 'smooth',
-              block: 'nearest',
-            });
-          }}
+          onGateDocChange={handleGateDocChange}
+          revisionMode={gateRevisionMode}
+          onCommitted={commitToChatPhase}
+          onCancelRevision={gateRevisionMode ? cancelGateRevision : undefined}
         />
       )}
-      <div className="consultoria-container">
+      {showConsultoriaChat && (
+        <div className="consultoria-container">
         {sidebarOpen && (
           <div className="history-overlay" onClick={() => setSidebarOpen(false)} />
         )}
@@ -486,6 +533,18 @@ export function ConsultoriaIAPage() {
                 </div>
               )}
               <p className="chat-subtitle">Consultor estratégico Magnus Mind</p>
+              {diagnosticComplete === true &&
+                uiPhase === 'chat' &&
+                (gateDoc?.selectedPath || gateDoc?.skipped) && (
+                  <button
+                    type="button"
+                    className="chat-gate-revisit-button"
+                    onClick={openGateRevision}
+                  >
+                    <GitBranch size={15} aria-hidden />
+                    Refazer escolha (Gate Zero)
+                  </button>
+                )}
             </div>
             <div className="chat-model-selector">
               <label className="chat-model-label">
@@ -504,16 +563,6 @@ export function ConsultoriaIAPage() {
                 ))}
               </select>
             </div>
-            <button
-              type="button"
-              className="chat-config-button"
-              onClick={() => navigate('/dashboard/blueprint/config')}
-              aria-label="Configurar agente e skills"
-              title="Configurar agente e skills"
-            >
-              <Settings2 size={16} aria-hidden />
-              <span>Config · Skills</span>
-            </button>
           </header>
 
           <div className="chat-messages">
@@ -595,9 +644,18 @@ export function ConsultoriaIAPage() {
                 </div>
                 <h2 className="chat-empty-title">Onda 2 — Design · MM Blueprint</h2>
                 <p className="chat-empty-description">
-                  Confirme o <strong>Gate Zero</strong> acima (Caminho A ou B). Depois, a IA conduz o
-                  Blueprint: Outcome Forge → Build → Impact Evaluation — com clareza para agir, sem
-                  atalhos que ignorem o diagnóstico.
+                  {gateDoc?.selectedPath || gateDoc?.skipped ? (
+                    <>
+                      O contexto do diagnóstico e do <strong>Gate Zero</strong> já entram nas respostas.
+                      Use as sugestões abaixo ou escreva sua própria pergunta.
+                    </>
+                  ) : (
+                    <>
+                      Confirme o <strong>Gate Zero</strong> (Caminho A ou B) na etapa anterior. Depois, a
+                      IA conduz o Blueprint: Outcome Forge → Build → Impact Evaluation — com clareza para
+                      agir, sem atalhos que ignorem o diagnóstico.
+                    </>
+                  )}
                 </p>
                 {showObjectivesBanner && (
                   <div className="chat-empty-objectives-hint">
@@ -695,14 +753,6 @@ export function ConsultoriaIAPage() {
                       <span className="chat-skill-menu-title">{skill.title}</span>
                     </button>
                   ))}
-                  <button
-                    type="button"
-                    className="chat-skill-menu-footer"
-                    onClick={() => navigate('/dashboard/blueprint/config')}
-                  >
-                    <Plus size={12} aria-hidden />
-                    Gerenciar skills
-                  </button>
                 </div>
               )}
               <input
@@ -742,6 +792,7 @@ export function ConsultoriaIAPage() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

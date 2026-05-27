@@ -697,6 +697,14 @@
   padding-top: 0.15rem;
 }
 
+.gate-zero-footer-cancel {
+  flex: 1 1 100%;
+  display: inline-flex;
+  justify-content: center;
+  width: 100%;
+  box-sizing: border-box;
+}
+
 .gate-zero-scroll-row {
   width: 100%;
   display: flex;

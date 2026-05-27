@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import axios from 'axios';
 import { GitBranch, Sparkles, Check, RotateCcw, ArrowDown } from 'lucide-react';
 import type { BlueprintPath } from '../constants/blueprintFlow';
 import {
@@ -23,6 +24,12 @@ interface GateZeroPanelProps {
   onGateDocChange: (doc: BlueprintGateDoc | null) => void;
   /** Rola até o campo de mensagem (área de chat) */
   onScrollToChat?: () => void;
+  /** Mostra o painel completo de escolhas mesmo já existindo decisão (refazer Gate Zero). */
+  revisionMode?: boolean;
+  /** Chamado após confirmar caminho ou “decidir depois”, para o pai abrir só o chat. */
+  onCommitted?: () => void;
+  /** Voltar ao chat sem alterar a decisão guardada. */
+  onCancelRevision?: () => void;
 }
 
 function formatRationaleSnippet(text: string, max = 220) {
@@ -37,6 +44,9 @@ export function GateZeroPanel({
   gateLoading,
   onGateDocChange,
   onScrollToChat,
+  revisionMode = false,
+  onCommitted,
+  onCancelRevision,
 }: GateZeroPanelProps) {
   const [draftPath, setDraftPath] = useState<BlueprintPath | null>(null);
   const [aiParsed, setAiParsed] = useState<BlueprintGateParsed | null>(null);
@@ -48,7 +58,16 @@ export function GateZeroPanel({
   const user = auth.currentUser;
   const hasSelection = Boolean(gateDoc?.selectedPath);
   const skipped = Boolean(gateDoc?.skipped) && !gateDoc?.selectedPath;
-  const showFullPanel = !hasSelection && !skipped;
+  const showFullPanel = revisionMode || (!hasSelection && !skipped);
+
+  useEffect(() => {
+    if (!revisionMode) return;
+    if (gateDoc?.selectedPath) {
+      setDraftPath(gateDoc.selectedPath);
+    } else if (skipped) {
+      setDraftPath(null);
+    }
+  }, [revisionMode, gateDoc?.selectedPath, skipped]);
 
   const applyAiSuggestion = () => {
     if (aiParsed) setDraftPath(aiParsed.recommendedPath);
@@ -72,24 +91,43 @@ export function GateZeroPanel({
         );
       }
     } catch (e: unknown) {
-      const ax = e as {
-        response?: { status?: number; data?: { error?: string; code?: string } };
-        message?: string;
-      };
-      const status = ax.response?.status;
-      const serverErr = ax.response?.data?.error;
-      const hint =
-        serverErr ||
-        (typeof ax.message === 'string' && ax.message !== 'Network Error' ? ax.message : '');
-      if (status === 404) {
-        setLocalError(
-          'Rota /api/ai/blueprint-gate não encontrada no servidor. Atualize o deploy da API no Render (pasta server) e tente de novo.'
-        );
+      if (axios.isAxiosError(e)) {
+        const status = e.response?.status;
+        const data = e.response?.data as Record<string, unknown> | undefined;
+        const serverErr = typeof data?.error === 'string' ? data.error : '';
+        const serverMsg = typeof data?.message === 'string' ? data.message : '';
+        const serverCode = typeof data?.code === 'string' ? data.code : '';
+
+        let detail = serverErr || serverMsg;
+        if (!detail && e.code === 'ECONNABORTED') {
+          detail =
+            'Tempo esgotado — a API ou a OpenRouter demoraram. Tente de novo em instantes (cold start no Render pode levar ~1 min).';
+        }
+        if (!detail && e.message === 'Network Error') {
+          detail =
+            'Sem resposta do servidor (URL da API, CORS ou rede). Confira VITE_API_BASE_URL no Netlify e se CORS_ORIGIN no Render inclui o domínio do site.';
+        }
+        if (!detail && status) {
+          detail = `HTTP ${status}`;
+        }
+        if (!detail) {
+          detail = e.message || 'Erro desconhecido na chamada à API';
+        }
+        const suffix = serverCode ? ` [${serverCode}]` : '';
+
+        if (status === 404) {
+          setLocalError(
+            'Rota /api/ai/blueprint-gate não encontrada no servidor. Atualize o deploy da API no Render (Root Directory = server) e tente de novo.'
+          );
+        } else {
+          setLocalError(
+            `Não foi possível obter a sugestão da IA: ${detail}${suffix}. Tente de novo ou escolha o caminho manualmente.`
+          );
+        }
       } else {
+        const msg = e instanceof Error ? e.message : String(e);
         setLocalError(
-          hint
-            ? `Não foi possível obter a sugestão da IA: ${hint}. Tente de novo ou escolha o caminho manualmente.`
-            : 'Não foi possível obter a sugestão da IA (rede ou servidor). Tente de novo ou escolha o caminho manualmente.'
+          `Não foi possível obter a sugestão da IA: ${msg}. Tente de novo ou escolha o caminho manualmente.`
         );
       }
     } finally {
@@ -117,6 +155,7 @@ export function GateZeroPanel({
         skipped: false,
         confirmedAt: new Date(),
       });
+      onCommitted?.();
     } catch (e: unknown) {
       if (e instanceof FirebaseError && e.code === 'permission-denied') {
         setLocalError(
@@ -142,6 +181,7 @@ export function GateZeroPanel({
         skipped: true,
         confirmedAt: new Date(),
       });
+      onCommitted?.();
     } catch (e: unknown) {
       if (e instanceof FirebaseError && e.code === 'permission-denied') {
         setLocalError(
@@ -180,7 +220,7 @@ export function GateZeroPanel({
     );
   }
 
-  if (hasSelection && gateDoc?.selectedPath) {
+  if (hasSelection && gateDoc?.selectedPath && !revisionMode) {
     const label =
       gateDoc.selectedPath === 'A'
         ? 'Caminho A — treinamento se aplica'
@@ -216,7 +256,7 @@ export function GateZeroPanel({
     );
   }
 
-  if (skipped) {
+  if (skipped && !revisionMode) {
     return (
       <div className="gate-zero-panel gate-zero-panel--skipped">
         <div className="gate-zero-surface">
@@ -365,6 +405,16 @@ export function GateZeroPanel({
         )}
 
         <div className="gate-zero-footer">
+          {revisionMode && onCancelRevision ? (
+            <button
+              type="button"
+              className="gate-zero-secondary-button gate-zero-footer-cancel"
+              onClick={() => onCancelRevision()}
+              disabled={saving}
+            >
+              Voltar ao chat sem alterar
+            </button>
+          ) : null}
           <button
             type="button"
             className="gate-zero-primary-button"
@@ -372,7 +422,7 @@ export function GateZeroPanel({
             disabled={saving || !draftPath}
           >
             <Check size={17} aria-hidden />
-            Confirmar e seguir para o Blueprint
+            {revisionMode ? 'Salvar decisão e voltar ao chat' : 'Confirmar e seguir para o Blueprint'}
           </button>
           <button
             type="button"

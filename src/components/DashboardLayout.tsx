@@ -10,7 +10,6 @@ import {
   History,
   LogOut,
   Menu,
-  Settings2,
 } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../config/firebase';
@@ -19,7 +18,6 @@ const navItems = [
   { id: 'dashboard', label: 'Hub (MID)', icon: LayoutDashboard, path: '/dashboard' },
   { id: 'formulario', label: '1 · Diagnóstico', icon: FileText, path: '/dashboard/initial-form' },
   { id: 'consultoria', label: '2 · Design (Blueprint)', icon: Bot, path: '/dashboard/consultoria-ia' },
-  { id: 'blueprint-config', label: '2.0 · Config Agente', icon: Settings2, path: '/dashboard/blueprint/config' },
   { id: 'objetivos', label: '3 · Difusão', icon: Target, path: '/dashboard/objetivos' },
   { id: 'equipe', label: 'Equipe', icon: Users, path: '/dashboard/minha-equipe' },
   { id: 'relatorios', label: '4 · Domínio (MID)', icon: BarChart3, path: '/dashboard/relatorios' },

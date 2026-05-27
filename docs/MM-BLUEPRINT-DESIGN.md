@@ -158,7 +158,6 @@ Ordem frequente na prática: *Sistema primeiro → Pessoas depois* (B estabiliza
 | `src/components/GateZeroPanel.tsx` | Painel 2.0: sugestão IA, escolha A/B, Firestore `blueprintGate` |
 | `src/services/blueprintGate.ts` | Leitura/gravação Firestore `blueprintGate/{uid}` |
 | `server/src/services/blueprintGate.ts` | `POST /api/ai/blueprint-gate` (sem persistir conversa) |
-| `src/pages/BlueprintConfigPage.tsx` | Skills/prompts editáveis (Outcome Forge, Build, Impact…) |
 | Firestore | `blueprintGate/{userId}` — ver `DEPLOY.md` |
 | `docs/FLUXO-PROJETO.md` | Mapa geral das 4 ondas |
 

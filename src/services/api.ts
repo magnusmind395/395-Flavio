@@ -15,7 +15,7 @@ import {
 const API_BASE_URL =
   import.meta.env.VITE_USE_LOCAL_API === 'true'
     ? ''
-    : (import.meta.env.VITE_API_BASE_URL || 'https://three95-flavio.onrender.com');
+    : (import.meta.env.VITE_API_BASE_URL || 'https://three95-flavio-fcha.onrender.com');
 const DEFAULT_TIMEOUT = 90000;
 const CHAT_TIMEOUT = 120000;
 
