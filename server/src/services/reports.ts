@@ -1,4 +1,4 @@
-import { Objective, Report, ReportStats, TeamMember } from '../types';
+import { ActionCanvas, Objective, Report, ReportStats, TeamMember } from '../types';
 import { generateId, nowIso } from '../utils/id';
 import { listByUser, create, COLLECTIONS } from './storage';
 import { chatCompletion, mockChatReply } from './openrouter';
@@ -22,10 +22,13 @@ function computeStats(objectives: Objective[], team: TeamMember[]): ReportStats 
 }
 
 export async function generateReport(userId: string): Promise<Report> {
-  const [objectives, team] = await Promise.all([
+  const [objectives, team, actionCanvases] = await Promise.all([
     listByUser<Objective>(COLLECTIONS.objectives, userId),
     listByUser<TeamMember>(COLLECTIONS.teamMembers, userId),
+    listByUser<ActionCanvas>(COLLECTIONS.actionCanvases, userId),
   ]);
+
+  const closedCanvases = actionCanvases.filter((c) => c.fechado);
 
   const stats = computeStats(objectives, team);
 
@@ -43,6 +46,14 @@ ${objectives
   .slice(0, 15)
   .map((o) => `- [${o.status}] ${o.titulo} (${o.categoria})`)
   .join('\n')}
+
+Action Canvas encerrados (${closedCanvases.length}):
+${closedCanvases
+  .map((c) => {
+    const n = c.entregas.filter((e) => e.entrega.trim()).length;
+    return `- ${c.nomeIniciativa} | sign-off ${c.signOff} | ${n} entregas | owner ${c.owner}`;
+  })
+  .join('\n') || '- nenhum'}
 `.trim();
 
   const prompt = `Com base nos dados abaixo, gere um relatório estratégico executivo em português brasileiro.

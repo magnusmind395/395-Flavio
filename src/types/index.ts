@@ -27,6 +27,57 @@ export const BUSINESS_STAGES: BusinessStage[] = [
   'Reinvenção',
 ];
 
+export type DeliveryStatus = 'verde' | 'amarelo' | 'vermelho';
+export type ActionCanvasSignOff = 'pendente' | 'sim' | 'nao';
+
+export interface ActionCanvasDelivery {
+  id: string;
+  entrega: string;
+  responsavel: string;
+  prazo: string;
+  status: DeliveryStatus;
+  evidencia: string;
+}
+
+export interface ActionCanvasRisk {
+  id: string;
+  risco: string;
+  acaoTomar: string;
+}
+
+/** Rascunho sugerido pela IA antes de criar no backend */
+export interface SuggestedActionCanvasDraft {
+  nomeIniciativa: string;
+  objetivoEspecifico: string;
+  owner: string;
+  sponsor: string;
+  prazoFinal: string;
+  entregas: Array<{
+    entrega: string;
+    responsavel: string;
+    prazo: string;
+    status?: DeliveryStatus;
+    evidencia?: string;
+  }>;
+  riscos: Array<{ risco: string; acaoTomar: string }>;
+  insightOrigem?: string;
+}
+
+export interface ActionCanvas {
+  id: string;
+  nomeIniciativa: string;
+  objetivoEspecifico: string;
+  owner: string;
+  sponsor: string;
+  prazoFinal: string;
+  entregas: ActionCanvasDelivery[];
+  riscos: ActionCanvasRisk[];
+  signOff: ActionCanvasSignOff;
+  fechado: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export type ObjectiveStatus = 'nao_iniciado' | 'em_andamento' | 'concluido';
 export type ObjectivePriority = 'alta' | 'media' | 'baixa';
 export type ObjectiveHorizon = 'curto' | 'medio' | 'longo';

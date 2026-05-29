@@ -11,6 +11,10 @@ import {
   getAgentSettings,
   resolveMentionedSkills,
 } from './agentConfig';
+import {
+  buildMagnusWavesMemoryContext,
+  MAGNUS_MEMORY_SYSTEM_PREAMBLE,
+} from './magnusMemory';
 
 const SYSTEM_PROMPT = `Você é o consultor estratégico Magnus Mind, especializado em gestão, performance humana, OKRs, planejamento e liderança.
 Você trabalha com o método Magnus Waves do MM People Sprint 90+:
@@ -62,6 +66,7 @@ export interface ChatRequest {
   conversationId?: string;
   model?: string;
   diagnosticContext?: string;
+  gateContext?: string;
   suggestObjectives?: boolean;
 }
 
@@ -119,9 +124,13 @@ export async function handleChat(req: ChatRequest): Promise<ChatResponse> {
   if (ragContext) {
     systemParts.push(`\n\n## Frameworks consultivos relevantes\n${ragContext}`);
   }
-  if (req.diagnosticContext?.trim()) {
+  const magnusMemory = await buildMagnusWavesMemoryContext(req.userId, {
+    diagnosticContext: req.diagnosticContext,
+    gateContext: req.gateContext,
+  });
+  if (magnusMemory.trim()) {
     systemParts.push(
-      `\n\n## Diagnóstico Magnus Waves do cliente\nUse este diagnóstico como fonte primária para personalizar a resposta. Se houver lacunas, aponte-as de forma objetiva antes de inferir.\n${req.diagnosticContext.trim()}`
+      `\n\n## Memória Magnus Waves (diagnóstico → design → difusão)\n${MAGNUS_MEMORY_SYSTEM_PREAMBLE}\n\n${magnusMemory}`
     );
   }
   if (webContext) {

@@ -58,7 +58,7 @@ export const MAGNUS_WAVES: MagnusWave[] = [
     miroRef: '4 WS -> Imprint -> Follow-up',
     route: '/dashboard/objetivos',
     steps: [
-      { id: '3.0', label: 'Make the Move', description: 'Tirar do papel e colocar em movimento' },
+      { id: '3.0', label: 'Action Canvas', description: 'Iniciativa, execução, risco e sign-off' },
       { id: '3.1', label: '4 WS', description: 'Workshops e ritmo de execução' },
       { id: '3.2', label: 'Imprint', description: 'Imprimir comportamento na rotina' },
       { id: '3.3', label: 'Follow-up', description: 'Acompanhar com dono e prazo' },
@@ -154,7 +154,7 @@ export function getWaveStatus(waveId: WaveId, progress: SprintProgress): WaveSta
       return objectivesTotal > 0 ? 'complete' : 'active';
     case 'difusao':
       if (!formComplete) return 'locked';
-      return objectivesTotal > 0 ? 'active' : 'locked';
+      return 'active';
     case 'dominio':
       if (!formComplete) return 'locked';
       return reportsCount > 0 ? 'complete' : objectivesTotal > 0 ? 'active' : 'locked';

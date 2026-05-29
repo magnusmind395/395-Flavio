@@ -21,6 +21,8 @@ import {
   X,
 } from 'lucide-react';
 import { auth } from '../config/firebase';
+import { ActionCanvasPanel } from '../components/ActionCanvasPanel';
+import { MagnusMemoryBanner } from '../components/MagnusMemoryBanner';
 import { objectivesApi } from '../services/api';
 import { loadDesignDiffusionContext, type DesignDiffusionContext } from '../services/designDiffusionContext';
 import {
@@ -151,6 +153,7 @@ export function ObjetivosPage() {
   const [suggestLoading, setSuggestLoading] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
   const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
+  const [difusaoTab, setDifusaoTab] = useState<'canvas' | 'objetivos'>('canvas');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -169,6 +172,20 @@ export function ObjetivosPage() {
     load();
   }, [load]);
 
+  const reloadDesignContext = useCallback(() => {
+    const user = auth.currentUser;
+    if (!user) {
+      setDesignContext(null);
+      setDesignContextLoading(false);
+      return;
+    }
+    setDesignContextLoading(true);
+    loadDesignDiffusionContext(user.uid)
+      .then(setDesignContext)
+      .catch(() => setDesignContext(null))
+      .finally(() => setDesignContextLoading(false));
+  }, []);
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       if (!user) {
@@ -176,18 +193,21 @@ export function ObjetivosPage() {
         setDesignContextLoading(false);
         return;
       }
-      setDesignContextLoading(true);
-      loadDesignDiffusionContext(user.uid)
-        .then(setDesignContext)
-        .catch(() => setDesignContext(null))
-        .finally(() => setDesignContextLoading(false));
+      reloadDesignContext();
     });
     return unsub;
-  }, []);
+  }, [reloadDesignContext]);
 
   useEffect(() => {
-    const state = location.state as { openCreateModal?: boolean } | null;
+    const state = location.state as {
+      openCreateModal?: boolean;
+      difusaoTab?: 'canvas' | 'objetivos';
+    } | null;
+    if (state?.difusaoTab) {
+      setDifusaoTab(state.difusaoTab);
+    }
     if (state?.openCreateModal) {
+      setDifusaoTab('objetivos');
       setEditing(null);
       setForm({ ...EMPTY_FORM });
       setFormError(null);
@@ -440,30 +460,82 @@ export function ObjetivosPage() {
 
   return (
     <div className="objetivos-page">
-      <header className="objetivos-header">
+      <header className="objetivos-header difusao-wave-header">
         <div className="objetivos-title-group">
-          <div className="objetivos-icon-wrapper">
-            <Target size={28} />
+          <div className="objetivos-icon-wrapper" aria-hidden>
+            <Target size={26} />
           </div>
-          <div>
-            <h1 className="objetivos-title">Onda 3 — Difusão · Make the Move</h1>
+          <div className="objetivos-title-copy">
+            <span className="difusao-header-eyebrow">MAGNUS WAVES™ · Onda 3</span>
+            <h1 className="objetivos-title">Difusão · Make the Move</h1>
             <p className="objetivos-subtitle">
-              3.1 4 WS · 3.2 Imprint · 3.3 Follow-up — planos simples, ações com dono e ritmo real.
+              Action Canvas → Execução → Risco &amp; Sign-off · depois objetivos (4 WS, Imprint, Follow-up).
             </p>
           </div>
         </div>
         <div className="objetivos-header-actions">
-          <div className="objetivos-ai-pill">
-            <Sparkles size={14} />
-            <span>Sugestões com IA</span>
-          </div>
-          <button type="button" className="objetivos-link-button" onClick={() => navigate('/dashboard/consultoria-ia')}>
-            MM Blueprint (Design)
-            <ArrowRight size={16} />
+          <button
+            type="button"
+            className="objetivos-header-btn objetivos-header-btn--ai"
+            onClick={() => {
+              setDifusaoTab('objetivos');
+              void loadSuggestions();
+            }}
+            disabled={suggestLoading || designContextLoading || !designContext?.diagnosticComplete}
+            title={
+              !designContext?.diagnosticComplete
+                ? 'Complete o diagnóstico Magnus Waves para gerar sugestões'
+                : 'Gerar objetivos estratégicos com base na memória da IA'
+            }
+          >
+            <Sparkles size={16} aria-hidden />
+            <span>{suggestLoading ? 'Gerando…' : 'Sugestões com IA'}</span>
+          </button>
+          <button
+            type="button"
+            className="objetivos-header-btn objetivos-header-btn--blueprint"
+            onClick={() => navigate('/dashboard/consultoria-ia')}
+            title="Abrir Consultoria IA e MM Blueprint (Onda 2 — Design)"
+          >
+            <GitBranch size={16} aria-hidden />
+            <span>MM Blueprint</span>
+            <ArrowRight size={15} aria-hidden className="objetivos-header-btn-arrow" />
           </button>
         </div>
       </header>
 
+      <nav className="difusao-tabs" aria-label="Seções da Difusão">
+        <button
+          type="button"
+          className={`difusao-tab ${difusaoTab === 'canvas' ? 'active' : ''}`}
+          onClick={() => setDifusaoTab('canvas')}
+        >
+          1 · Action Canvas
+        </button>
+        <button
+          type="button"
+          className={`difusao-tab ${difusaoTab === 'objetivos' ? 'active' : ''}`}
+          onClick={() => setDifusaoTab('objetivos')}
+        >
+          2 · Objetivos estratégicos
+        </button>
+      </nav>
+
+      <MagnusMemoryBanner
+        meta={designContext?.meta ?? null}
+        statusLabel={designContext?.statusLabel}
+        loading={designContextLoading}
+      />
+
+      {difusaoTab === 'canvas' && (
+        <ActionCanvasPanel
+          canUseAi={Boolean(designContext?.diagnosticComplete)}
+          onCanvasClosed={() => reloadDesignContext()}
+        />
+      )}
+
+      {difusaoTab === 'objetivos' && (
+        <>
       <div className="objetivos-summary">
         <div className="objetivo-summary-card">
           <span className="summary-label">Total</span>
@@ -813,7 +885,10 @@ export function ObjetivosPage() {
         </div>
       )}
 
-      {suggestionsOpen && (
+        </>
+      )}
+
+      {difusaoTab === 'objetivos' && suggestionsOpen && (
         <div className="suggestions-modal-overlay" onClick={() => setSuggestionsOpen(false)}>
           <div className="suggestions-modal" onClick={(e) => e.stopPropagation()}>
             <div className="suggestions-modal-header">

@@ -16,6 +16,7 @@ import {
   saveBlueprintGateSkipped,
   type BlueprintGateDoc,
 } from '../services/blueprintGate';
+import { syncMagnusMemoryAfterGate } from '../services/magnusMemorySync';
 
 interface GateZeroPanelProps {
   diagnosticContext: string;
@@ -145,6 +146,10 @@ export function GateZeroPanel({
     try {
       await saveBlueprintGateSelection(user.uid, {
         selectedPath: draftPath,
+        aiRecommendedPath: aiParsed?.recommendedPath,
+        rationale: aiParsed?.rationale,
+      });
+      await syncMagnusMemoryAfterGate(draftPath, {
         aiRecommendedPath: aiParsed?.recommendedPath,
         rationale: aiParsed?.rationale,
       });

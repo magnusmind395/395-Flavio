@@ -3,6 +3,7 @@ import { env } from '../config/env';
 import { COLLECTIONS, listByUser } from './storage';
 import { chatCompletion, mockChatReply } from './openrouter';
 import { retrieveRelevantContext } from './rag';
+import { buildMagnusWavesMemoryContext, MAGNUS_MEMORY_SYSTEM_PREAMBLE } from './magnusMemory';
 
 const DEFAULT_SUGGESTIONS: SuggestedObjective[] = [
   {
@@ -59,19 +60,28 @@ function normalizeSuggestion(item: SuggestedObjective): SuggestedObjective | nul
 
 export async function suggestObjectives(userId: string, context?: string): Promise<SuggestedObjective[]> {
   const existing = await listByUser<Objective>(COLLECTIONS.objectives, userId);
+  const magnusMemory = await buildMagnusWavesMemoryContext(userId);
+  const memoryBlock = [
+    MAGNUS_MEMORY_SYSTEM_PREAMBLE,
+    magnusMemory.trim(),
+    context?.trim() && context.trim() !== magnusMemory.trim() ? context.trim() : '',
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+
   const ragContext = await retrieveRelevantContext(
     userId,
-    context ?? 'objetivos estrategicos planejamento difusao make the move'
+    context ?? 'objetivos estrategicos planejamento difusao make the move action canvas'
   );
 
   const prompt = `Sugira 3 a 5 objetivos estrategicos novos para a etapa 3 - Difusao (Make the Move) de uma empresa.
-Os objetivos devem nascer do diagnostico do usuario e do MM Blueprint, quando estes dados estiverem no contexto.
+Os objetivos devem nascer do diagnostico, MM Blueprint, Action Canvas encerrados e objetivos ja existentes — use a memoria abaixo.
 Cubra, quando fizer sentido:
 - 3.1 4 WS: objetivo de acao com What, Why, Who e When
 - 3.2 Imprint: objetivo para incorporar a solucao no trabalho real
 - 3.3 Follow-up: objetivo para medir aplicacao, barreiras e impacto
 
-${context ? `Contexto do usuario:\n${context}` : ''}
+${memoryBlock ? `Memoria Magnus Waves:\n${memoryBlock}` : context ? `Contexto do usuario:\n${context}` : ''}
 Objetivos existentes (evite duplicar): ${existing.map((o) => o.titulo).join(', ') || 'nenhum'}
 
 Frameworks:

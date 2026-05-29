@@ -45,7 +45,7 @@ function typeIcon(type: string) {
 
 function linkForType(type: string): string | null {
   if (type === 'chat') return '/dashboard/consultoria-ia';
-  if (type === 'objective') return '/dashboard/objetivos';
+  if (type === 'objective' || type === 'action_canvas') return '/dashboard/objetivos';
   if (type === 'team') return '/dashboard/minha-equipe';
   if (type === 'report') return '/dashboard/relatorios';
   return null;

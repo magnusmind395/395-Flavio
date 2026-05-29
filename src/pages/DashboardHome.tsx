@@ -17,7 +17,8 @@ import {
 } from 'lucide-react';
 import { auth } from '../config/firebase';
 import { getInitialForm } from '../services/initialForm';
-import { objectivesApi, teamApi, reportsApi, activitiesApi } from '../services/api';
+import { actionCanvasesApi, objectivesApi, teamApi, reportsApi, activitiesApi } from '../services/api';
+import type { ActionCanvas } from '../types';
 import { MagnusWavesProgress } from '../components/MagnusWavesProgress';
 import { STAGE_DESCRIPTIONS, PRIORITY_LABELS, type InitialFormData, type Objective } from '../types';
 
@@ -78,6 +79,7 @@ export function DashboardHome() {
   const [reportsCount, setReportsCount] = useState(0);
   const [recommendations, setRecommendations] = useState<Objective[]>([]);
   const [activities, setActivities] = useState<{ action: string; date: string; type: string }[]>([]);
+  const [closedCanvases, setClosedCanvases] = useState<ActionCanvas[]>([]);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setUserId(u?.uid ?? null));
@@ -114,8 +116,9 @@ export function DashboardHome() {
       teamApi.list(),
       reportsApi.list(),
       activitiesApi.list({ limit: '5' }),
+      actionCanvasesApi.list().catch(() => []),
     ])
-      .then(([objs, team, reports, acts]) => {
+      .then(([objs, team, reports, acts, canvases]) => {
         if (cancelled) return;
         const list = Array.isArray(objs) ? objs : objs?.items ?? [];
         const done = list.filter((o: Objective) => o.status === 'concluido').length;
@@ -139,6 +142,8 @@ export function DashboardHome() {
             type: activityIndicatorType(a.type || ''),
           }))
         );
+        const canvasList = (Array.isArray(canvases) ? canvases : []) as ActionCanvas[];
+        setClosedCanvases(canvasList.filter((c) => c.fechado));
       })
       .finally(() => !cancelled && setStatsLoading(false));
     return () => { cancelled = true; };
@@ -332,6 +337,55 @@ export function DashboardHome() {
         )}
       </div>
 
+      {closedCanvases.length > 0 && (
+        <section className="mid-diffusion-panel" aria-labelledby="mid-diffusion-heading">
+          <h2 id="mid-diffusion-heading" className="mid-diffusion-title">
+            MID — Resultados da Difusão (Action Canvas encerrados)
+          </h2>
+          <p className="mid-diffusion-subtitle">
+            Iniciativas com sign-off registrado. Dados alimentam o Domínio (relatórios Kirkpatrick).
+          </p>
+          <div className="mid-diffusion-grid">
+            {closedCanvases.map((c) => {
+              const entregas = c.entregas.filter((e) => e.entrega.trim());
+              const verde = entregas.filter((e) => e.status === 'verde').length;
+              const vermelho = entregas.filter((e) => e.status === 'vermelho').length;
+              return (
+                <article key={c.id} className="mid-diffusion-card">
+                  <h4>{c.nomeIniciativa || 'Iniciativa sem nome'}</h4>
+                  <p>
+                    <strong>Objetivo:</strong> {c.objetivoEspecifico || '—'}
+                  </p>
+                  <p>
+                    Owner: {c.owner || '—'} · Sponsor: {c.sponsor || '—'}
+                  </p>
+                  <p>
+                    Sign-off: <strong>{c.signOff === 'sim' ? 'SIM' : 'NÃO'}</strong>
+                    {c.prazoFinal
+                      ? ` · Prazo: ${new Date(c.prazoFinal).toLocaleDateString('pt-BR')}`
+                      : ''}
+                  </p>
+                  <div className="mid-diffusion-stats">
+                    <span>🟢 {verde}</span>
+                    <span>🔴 {vermelho}</span>
+                    <span>{entregas.length} entregas</span>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            className="card-action-button"
+            style={{ marginTop: '1rem' }}
+            onClick={() => navigate('/dashboard/objetivos')}
+          >
+            Ver Action Canvas na Difusão
+            <ArrowRight size={16} />
+          </button>
+        </section>
+      )}
+
       <div className="dashboard-section">
         <div className="section-header-row">
           <div className="section-title-group">
@@ -347,6 +401,10 @@ export function DashboardHome() {
           <Link to="/dashboard/consultoria-ia" className="quick-action-card">
             <Bot size={32} className="action-icon" />
             <span className="action-label">MM Blueprint (IA)</span>
+          </Link>
+          <Link to="/dashboard/objetivos" className="quick-action-card">
+            <Target size={32} className="action-icon" />
+            <span className="action-label">Difusão — Action Canvas</span>
           </Link>
           <Link
             to="/dashboard/objetivos"

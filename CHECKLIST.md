@@ -20,6 +20,92 @@ Documento de validação do que foi implementado na plataforma.
 
 ---
 
+## Checklist — sessão 29/05/2026 (Action Canvas, memória IA, UI Difusão)
+
+### Onda 3 — Action Canvas (Make the Move)
+
+- [x] **Backend** — CRUD `GET/POST/PATCH/DELETE` em `/api/action-canvases`
+- [x] Limites: até **5** canvases, **10** entregas, **8** riscos por canvas
+- [x] Tipos `ActionCanvas`, entregas, riscos, sign-off (`sim`/`não`/`pendente`), `fechado`
+- [x] Coleção `actionCanvases` em storage + registro em `server/src/app.ts`
+- [x] **Frontend** — `ActionCanvasPanel.tsx` com fluxo em 4 passos (A mudança → Execução → Riscos → Sign-off)
+- [x] Lista lateral de iniciativas, barra de progresso, cards de entrega com pills 🟢🟡🔴
+- [x] Sign-off SIM/NÃO → encerra e aparece no **MID (Hub)** (`DashboardHome`)
+- [x] Página **Difusão** com abas: `1 · Action Canvas` | `2 · Objetivos estratégicos`
+- [x] Estilos dedicados: `src/styles/action-canvas.css` + import em `main.tsx`
+- [x] Passo **3.0 Action Canvas** em `magnusWaves.ts`; Difusão ativa após diagnóstico
+
+### Correção CRUD — excluir Action Canvas
+
+- [x] Causa: `DELETE`/`PATCH` sem `userId` → backend usava `demo-user` → 404
+- [x] Fix em `src/services/api.ts`: `remove` e `update` enviam `userId` na query (como `list`/`create`)
+- [x] Excluir na lista lateral e no rodapé do editor, com confirmação e mensagem de erro
+
+### UX e visual do Action Canvas (frontend-design)
+
+- [x] Direção editorial Magnus Mind: **Newsreader** + **Figtree**, bronze `#af9270`, warm `#ffbc7d`
+- [x] Painel com borda em gradiente, textura sutil, animações (entrada, troca de passo, `prefers-reduced-motion`)
+- [x] Stepper em timeline; **removida** linha horizontal que cortava os passos
+- [x] Anel de quota **1/5** (sem label “iniciativas” no centro)
+- [x] Skeleton de carregamento; botões Voltar / Próximo / Salvar / Excluir refinados
+
+### Memória Magnus Waves (IA interligada)
+
+- [x] Servidor: `server/src/services/magnusMemory.ts` — monta contexto único (diagnóstico → Gate → canvases → objetivos)
+- [x] Sync: `POST /api/magnus-memory/sync` — persiste texto do diagnóstico/Gate no servidor
+- [x] **Chat Consultoria IA** — bloco “Memória Magnus Waves” no system prompt de cada mensagem
+- [x] **Sugestões de objetivos** — usam memória completa (inclui Action Canvas encerrados)
+- [x] Cliente: `magnusWavesMemory.ts`, `magnusMemorySync.ts` — sync ao salvar diagnóstico, Gate Zero, canvas
+- [x] `loadDesignDiffusionContext` passa a usar memória unificada
+- [x] Banner **Memória Magnus Waves** na Difusão e na Consultoria IA (`MagnusMemoryBanner.tsx`)
+
+### Action Canvas gerado por IA
+
+- [x] `POST /api/action-canvases/suggest` + `actionCanvasSuggest.ts`
+- [x] IA propõe 1–3 canvases completos a partir da memória (diagnóstico + Gate Zero)
+- [x] Botão **Gerar com IA** no painel (requer diagnóstico completo)
+- [x] Modal de revisão → importar selecionados como canvases editáveis
+- [x] Fallback / modo demo se `OPENROUTER_API_KEY` ausente
+
+### Layout da página Difusão (Objetivos)
+
+- [x] Ordem: **Cabeçalho Onda 3** → **Abas** → **Memória** → conteúdo
+- [x] Espaçamento reduzido (header, banner, tabs, painel mais compactos)
+- [x] Cabeçalho Onda 3 em painel próprio (`difusao-wave-header`): eyebrow, título, ícone bronze
+- [x] **Sugestões com IA** — botão primário (warm): abre aba Objetivos + gera sugestões no modal
+- [x] **MM Blueprint** — botão secundário: navega para Consultoria IA (Design)
+- [x] Botões alinhados na mesma linha; responsivo em mobile
+
+### Arquivos principais tocados nesta sessão
+
+| Área | Caminhos |
+|------|----------|
+| Backend Action Canvas | `server/src/routes/actionCanvases.ts`, `server/src/services/actionCanvasSuggest.ts` |
+| Memória IA | `server/src/services/magnusMemory.ts`, `server/src/routes/magnusMemory.ts`, `server/src/services/aiChat.ts`, `objectivesSuggest.ts` |
+| Frontend | `src/components/ActionCanvasPanel.tsx`, `MagnusMemoryBanner.tsx`, `src/pages/ObjetivosPage.tsx`, `ConsultoriaIAPage.tsx` |
+| Sync / contexto | `src/services/magnusWavesMemory.ts`, `magnusMemorySync.ts`, `designDiffusionContext.ts`, `api.ts` |
+| UI | `src/styles/action-canvas.css` |
+| Hub | `src/pages/DashboardHome.tsx` (canvases encerrados no MID) |
+
+### Validar após deploy / local
+
+- [ ] Reiniciar backend: `npm run dev --prefix server`
+- [ ] Front: `npm run dev` (um processo Vite)
+- [ ] Completar diagnóstico → confirmar Gate Zero → Difusão
+- [ ] Criar / editar / **excluir** Action Canvas (usuário logado)
+- [ ] **Gerar com IA** → importar → revisar passos 1–4
+- [ ] Chat Consultoria: banner de memória com chips ativos
+- [ ] **Sugestões com IA** no header da Difusão → modal com objetivos
+- [ ] Encerrar canvas (sign-off) → conferir bloco no dashboard (MID)
+
+### Pendente / próximos passos (opcional)
+
+- [ ] IA **escrever** campos do diagnóstico por conversa (com confirmação antes de gravar no Firebase)
+- [ ] Amarrar canvases encerrados explicitamente no copy da Consultoria (tooltips / empty states)
+- [ ] Testes E2E do fluxo Difusão completo
+
+---
+
 ## Checklist — tudo que fizemos hoje (19/05/2026)
 
 ### Correções funcionais (API Render × frontend)

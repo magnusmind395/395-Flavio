@@ -1,3 +1,37 @@
+export type DeliveryStatus = 'verde' | 'amarelo' | 'vermelho';
+export type ActionCanvasSignOff = 'pendente' | 'sim' | 'nao';
+
+export interface ActionCanvasDelivery {
+  id: string;
+  entrega: string;
+  responsavel: string;
+  prazo: string;
+  status: DeliveryStatus;
+  evidencia: string;
+}
+
+export interface ActionCanvasRisk {
+  id: string;
+  risco: string;
+  acaoTomar: string;
+}
+
+export interface ActionCanvas {
+  id: string;
+  userId: string;
+  nomeIniciativa: string;
+  objetivoEspecifico: string;
+  owner: string;
+  sponsor: string;
+  prazoFinal: string;
+  entregas: ActionCanvasDelivery[];
+  riscos: ActionCanvasRisk[];
+  signOff: ActionCanvasSignOff;
+  fechado: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type ObjectiveStatus = 'pendente' | 'em_andamento' | 'concluido' | 'cancelado';
 export type ObjectiveOrigin = 'manual' | 'ia';
 

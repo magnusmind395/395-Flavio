@@ -39,6 +39,59 @@ async function withUserId<T>(fn: (userId: string | null) => Promise<T>): Promise
   return fn(userId);
 }
 
+export const magnusMemoryApi = {
+  sync: (data: { diagnosticContext?: string; gateContext?: string }) =>
+    withUserId((userId) =>
+      api
+        .post('/api/magnus-memory/sync', { ...data, userId: userId || undefined })
+        .then((r) => r.data as { ok: boolean; updatedAt?: string })
+    ),
+};
+
+export const actionCanvasesApi = {
+  list: () =>
+    withUserId((userId) =>
+      api
+        .get('/api/action-canvases', { params: userId ? { userId } : {} })
+        .then((r) => r.data as import('../types').ActionCanvas[])
+    ),
+  create: (data: unknown) =>
+    withUserId((userId) =>
+      api
+        .post('/api/action-canvases', { userId: userId || 'demo-user', ...(data as object) })
+        .then((r) => r.data as import('../types').ActionCanvas)
+    ),
+  update: (id: string, data: unknown) =>
+    withUserId((userId) =>
+      api
+        .patch(`/api/action-canvases/${id}`, data, {
+          params: userId ? { userId } : {},
+        })
+        .then((r) => r.data as import('../types').ActionCanvas)
+    ),
+  remove: (id: string) =>
+    withUserId((userId) =>
+      api.delete(`/api/action-canvases/${id}`, { params: userId ? { userId } : {} })
+    ),
+  suggest: (data?: { diagnosticContext?: string; gateContext?: string }) =>
+    withUserId((userId) =>
+      api
+        .post('/api/action-canvases/suggest', {
+          userId: userId || undefined,
+          diagnosticContext: data?.diagnosticContext,
+          gateContext: data?.gateContext,
+        })
+        .then(
+          (r) =>
+            r.data as {
+              suggestions: import('../types').SuggestedActionCanvasDraft[];
+              slotsAvailable: number;
+              demoMode?: boolean;
+            }
+        )
+    ),
+};
+
 export const objectivesApi = {
   list: (params?: Record<string, string>) =>
     withUserId((userId) => api.get('/api/objectives', { params: { ...params, ...(userId ? { userId } : {}) } }).then((r) => r.data)),
@@ -75,7 +128,13 @@ export const aiApi = {
     ),
   conversation: (id: string) =>
     api.get(`/api/ai/conversations/${id}`).then((r) => normalizeConversationDetail(r.data)),
-  chat: (data: { conversationId?: string; content: string; modelId?: string; diagnosticContext?: string }) =>
+  chat: (data: {
+    conversationId?: string;
+    content: string;
+    modelId?: string;
+    diagnosticContext?: string;
+    gateContext?: string;
+  }) =>
     withUserId((userId) =>
       api
         .post(
@@ -86,6 +145,7 @@ export const aiApi = {
             conversationId: data.conversationId,
             model: data.modelId,
             diagnosticContext: data.diagnosticContext,
+            gateContext: data.gateContext,
             userId: userId || undefined,
           },
           { timeout: CHAT_TIMEOUT }

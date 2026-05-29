@@ -8,12 +8,14 @@ import { isFirebaseEnabled } from './services/firebase';
 import { seedDefaultFrameworks } from './services/rag';
 
 import objectivesRouter from './routes/objectives';
+import actionCanvasesRouter from './routes/actionCanvases';
 import teamMembersRouter from './routes/teamMembers';
 import activitiesRouter from './routes/activities';
 import aiRouter from './routes/ai';
 import agentRouter from './routes/agent';
 import reportsRouter from './routes/reports';
 import whatsappRouter from './routes/whatsapp';
+import magnusMemoryRouter from './routes/magnusMemory';
 
 initFirebase();
 
@@ -48,6 +50,7 @@ app.get('/', (_req, res) => {
       health: '/api/health',
       ai: '/api/ai',
       objectives: '/api/objectives',
+      actionCanvases: '/api/action-canvases',
       reports: '/api/reports',
     },
     note: 'Esta URL é a API. O app web está no Netlify (frontend).',
@@ -57,9 +60,11 @@ app.get('/', (_req, res) => {
 app.use(resolveUserId);
 
 app.use('/api/objectives', objectivesRouter);
+app.use('/api/action-canvases', actionCanvasesRouter);
 app.use('/api/team-members', teamMembersRouter);
 app.use('/api/activities', activitiesRouter);
 app.use('/api/ai', aiRouter);
+app.use('/api/magnus-memory', magnusMemoryRouter);
 app.use('/api/agent', agentRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/whatsapp', whatsappRouter);

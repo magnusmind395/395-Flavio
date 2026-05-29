@@ -63,6 +63,7 @@ export const env = {
 };
 
 export const COLLECTIONS = {
+  actionCanvases: 'actionCanvases',
   objectives: 'objectives',
   teamMembers: 'teamMembers',
   conversations: 'conversations',

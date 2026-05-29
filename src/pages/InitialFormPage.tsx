@@ -34,6 +34,10 @@ import {
   type DiagnosticPhaseId,
 } from '../constants/diagnosticFlow';
 import { getInitialForm, saveInitialForm, saveInitialFormDraft } from '../services/initialForm';
+import {
+  scheduleMagnusMemorySyncFromForm,
+  syncMagnusMemoryToServer,
+} from '../services/magnusMemorySync';
 import type { DiagnosticFieldValue, InitialFormData } from '../types';
 
 const phaseIcons = {
@@ -550,6 +554,7 @@ export function InitialFormPage() {
     try {
       const at = await saveInitialFormDraft(userId, data);
       setDraftUpdatedAt(at);
+      scheduleMagnusMemorySyncFromForm(data);
       setFeedback('Rascunho salvo. A IA já poderá usar as respostas preenchidas quando você avançar.');
       scrollProjectToTop();
     } catch {
@@ -567,6 +572,7 @@ export function InitialFormPage() {
     setFeedback(null);
     try {
       const at = await saveInitialForm(userId, data);
+      await syncMagnusMemoryToServer({ diagnosticContext: buildDiagnosticContext(data) });
       setCompletedAt(at);
       scrollProjectToTop('auto');
       navigate('/dashboard', {

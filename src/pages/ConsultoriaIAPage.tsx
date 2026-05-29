@@ -3,6 +3,9 @@ import { Link } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { buildDiagnosticContext } from '../constants/diagnosticFlow';
+import { MagnusMemoryBanner } from '../components/MagnusMemoryBanner';
+import { loadMagnusWavesMemory, type MagnusWavesMemoryMeta } from '../services/magnusWavesMemory';
+import { syncMagnusMemoryFromFirebase } from '../services/magnusMemorySync';
 import { buildGateContextAppendix } from '../constants/blueprintFlow';
 import { getInitialForm } from '../services/initialForm';
 import { resolveConsultoriaUiPhase, writeConsultoriaGateUiPhase } from '../constants/consultoriaGateUi';
@@ -96,6 +99,8 @@ export function ConsultoriaIAPage() {
   const [titleDraft, setTitleDraft] = useState('');
   const [diagnosticComplete, setDiagnosticComplete] = useState<boolean | null>(null);
   const [diagnosticData, setDiagnosticData] = useState<InitialFormData | null>(null);
+  const [memoryMeta, setMemoryMeta] = useState<MagnusWavesMemoryMeta | null>(null);
+  const [memoryStatus, setMemoryStatus] = useState('');
   const [gateDoc, setGateDoc] = useState<BlueprintGateDoc | null>(null);
   const [gateLoading, setGateLoading] = useState(false);
   /** Com diagnóstico completo: `gate` = só tela Gate Zero; `chat` = só chat (persistido por utilizador). */
@@ -179,6 +184,16 @@ export function ConsultoriaIAPage() {
           setDiagnosticComplete(!!completedAt);
           setDiagnosticData(data);
           if (completedAt) {
+            void syncMagnusMemoryFromFirebase();
+            void loadMagnusWavesMemory(user.uid).then((m) => {
+              setMemoryMeta(m.meta);
+              setMemoryStatus(m.statusLabel);
+            });
+          } else {
+            setMemoryMeta(null);
+            setMemoryStatus('');
+          }
+          if (completedAt) {
             setGateLoading(true);
             getBlueprintGate(user.uid)
               .then((g) => {
@@ -225,7 +240,13 @@ export function ConsultoriaIAPage() {
 
   const commitToChatPhase = useCallback(() => {
     const uid = auth.currentUser?.uid;
-    if (uid) writeConsultoriaGateUiPhase(uid, 'chat');
+    if (uid) {
+      writeConsultoriaGateUiPhase(uid, 'chat');
+      void loadMagnusWavesMemory(uid).then((m) => {
+        setMemoryMeta(m.meta);
+        setMemoryStatus(m.statusLabel);
+      });
+    }
     setUiPhase('chat');
   }, []);
 
@@ -309,22 +330,21 @@ export function ConsultoriaIAPage() {
     setError(null);
 
     try {
-      const baseDiag = diagnosticData ? buildDiagnosticContext(diagnosticData) : '';
-      const gateAppend =
+      const diagnosticContext = diagnosticData ? buildDiagnosticContext(diagnosticData) : undefined;
+      const gateContext =
         gateDoc?.selectedPath != null
           ? buildGateContextAppendix(gateDoc.selectedPath, {
               aiRecommendedPath: gateDoc.aiRecommendedPath,
               rationale: gateDoc.rationale,
             })
-          : '';
-      const diagnosticContextMerged =
-        [baseDiag, gateAppend].filter(Boolean).join('\n\n') || undefined;
+          : undefined;
 
       const result = await aiApi.chat({
         conversationId: activeId || undefined,
         content,
         modelId: selectedModel || undefined,
-        diagnosticContext: diagnosticContextMerged,
+        diagnosticContext,
+        gateContext,
       });
 
       const convId = result.conversationId as string;
@@ -563,6 +583,16 @@ export function ConsultoriaIAPage() {
               </select>
             </div>
           </header>
+
+          {diagnosticComplete === true && uiPhase === 'chat' && (
+            <div className="consultoria-memory-wrap">
+              <MagnusMemoryBanner
+                meta={memoryMeta}
+                statusLabel={memoryStatus}
+                compact
+              />
+            </div>
+          )}
 
           <div className="chat-messages">
             {chatDemoModeBanner && (
